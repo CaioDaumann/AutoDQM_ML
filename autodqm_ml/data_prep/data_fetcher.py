@@ -197,8 +197,8 @@ class DataFetcher():
                                         break
 
 
-                print(len(files))
-                print(len(unique_files))
+                #print(len(files))
+                #print(len(unique_files))
                 if len(unique_files) < 5:
                     logger.info("[DataFetcher : get_list_of_files] Only '%s' runs have been selected, which is a very limited data set. Advise use a full set of runs outside of testing." % (len(unique_files)))
 
@@ -314,8 +314,10 @@ class DataFetcher():
                         histograms["year"] = [year]
                         histograms["label"] = [label]
                         for k, v in histograms.items():
+                            print(k)
+                            print(v)
                             self.data[pd][k] += v
-
+        
     def load_data(self, file, run_number, contents): 
         """
         Load specified histograms from a given file.
@@ -355,6 +357,37 @@ class DataFetcher():
         logger.debug("[DataFetcher : load_data] Histogram contents:")
         for hist, data in hist_data.items():
             logger.debug("\t %s : %s" % (hist, data))
+
+
+        '''
+        replacement_hists = []
+
+        #print(list(hist_data.values()))
+        for histogram_set in list(hist_data.values()):
+            if len(histogram_set[0].shape) > 1:
+                print("HERE")
+                #print(histogram_set[0])
+                #print(len(histogram_set),len(histogram_set[0]),len(histogram_set[0][0]))
+                #df[histogram] = rebinning_min_occupancy(df[histogram], 0.001)
+                #print(len(df[histogram]),len(df[histogram][0]))
+
+
+            for histogram_indiv in histogram_set:
+                #print(histogram_indiv)
+                #print(numpy.array(histogram_indiv).shape)
+                if numpy.array(histogram_indiv).ndim == 1:
+                    replacement_hists.append([histogram_indiv])
+                if numpy.array(histogram_indiv).ndim >= 2:
+                    #print(numpy.array(histogram_indiv).shape)
+                    #print(histogram_indiv)
+                    flattened_array = numpy.ravel(numpy.array(histogram_indiv))
+                    conv_flattened_array = [flattened_array.astype(numpy.float32)]
+                    replacement_hists.append(conv_flattened_array)
+
+        #print(replacement_hists)
+        for key, new_value in zip(hist_data.keys(), replacement_hists):
+            hist_data[key] = new_value
+        '''
 
         return hist_data
 

@@ -112,6 +112,8 @@ class AutoEncoder(MLAlgorithm):
                 hist_name = histogram
             logger.debug("[AutoEncoder : train] Training autoencoder with %d dimensions in latent space for histogram(s) '%s' with %d training examples." % (self.config["n_components"], hist_name, len(list(inputs.values())[0]))) 
 
+            print(self.histograms)
+
             if self.mode == "simultaneous":
                 histograms = self.histograms
             elif self.mode == "individual":
@@ -128,7 +130,7 @@ class AutoEncoder(MLAlgorithm):
             if self.config["early_stopping"]:
                 callbacks.append(keras.callbacks.EarlyStopping(patience = self.config["early_stopping_rounds"]))
             #print(self.config["n_components"])
-            #print(list(inputs.values())[0])
+            #print(list(inputs.values()).shape)
 
             model.fit(
                     inputs,
