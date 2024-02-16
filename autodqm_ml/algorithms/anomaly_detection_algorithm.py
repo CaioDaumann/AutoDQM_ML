@@ -99,10 +99,9 @@ class AnomalyDetectionAlgorithm():
                 if histogram_info["normalize"]:
                     if histogram_info["n_dim"] == 2:
                         #print(df[histogram])
-                        print("HERE")
                         print(len(df[histogram]),len(df[histogram][0]),len(df[histogram][0][0]))
                         logger.debug("[anomaly_detection_algorithm : load_data] Rebinning and normalising the 2D histogram '%s'" % histogram)
-                        df[histogram] = rebinning_min_occupancy(df[histogram], 0.001)
+                        df[histogram] = rebinning_min_occupancy(df[histogram], 0.0001)
                         #print(df[histogram])
                         new_shape = (len(df[histogram][0]),)
                         self.histograms[histogram]["shape"] = new_shape
