@@ -314,8 +314,6 @@ class DataFetcher():
                         histograms["year"] = [year]
                         histograms["label"] = [label]
                         for k, v in histograms.items():
-                            print(k)
-                            print(v)
                             self.data[pd][k] += v
         
     def load_data(self, file, run_number, contents): 
