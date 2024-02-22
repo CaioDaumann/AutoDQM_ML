@@ -1,8 +1,8 @@
-name: autodqm-ml
+name: autodqm-ml-luck
 channels:
   - conda-forge
 dependencies:
-  - python
+  - python=3.9
   - pyaml
   - uproot
   - numpy
@@ -16,3 +16,6 @@ dependencies:
   - scikit-learn
   - sphinx
   - sphinx_rtd_theme
+  - pip:
+    - yahist
+    - tensorflow=2.5
