@@ -358,6 +358,9 @@ class DataFetcher():
 
 
         '''
+        ## This is just a module to flatten histograms, it was from a test to see if the AE performance changed between 1D and 2D inputs
+        ## for the same histograms. The results were that there was no effect, and with the new rebinning procedure this is largely a 
+        ## redundant study as 2D hists are flattened de facto later on.
         replacement_hists = []
 
         #print(list(hist_data.values()))
