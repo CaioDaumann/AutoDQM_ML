@@ -102,9 +102,12 @@ def make_original_vs_reconstructed_plot1d(name, original, recos, run, save_name,
     plt.sca(ax1)
 
     for idx, h in enumerate(h_reco):
-        h.plot(ax=ax1, color = "C%d" % (idx+1), errors = False, linewidth=2)
+        if "pca" in save_name: idx = idx
+        if ("ae" in save_name) or ("autoencoder" in save_name): idx = idx + 1
 
     for idx, h in enumerate(h_reco):
+        if "pca" in save_name: idx = idx
+        if ("ae" in save_name) or ("autoencoder" in save_name): idx = idx + 1
         ratio = h.divide(h_orig)
         ratio.metadata["label"] = None
         ratio.plot(ax=ax2, color = "C%d" % (idx+1), errors = False, linewidth=2)
@@ -113,7 +116,7 @@ def make_original_vs_reconstructed_plot1d(name, original, recos, run, save_name,
     ax2.set_ylabel("ML Reco / Original")
     ax2.set_xlabel(x_label)
     ax2.set_ylim(rat_lim)
-    ax1.set_ylim([0.0, awkward.max(original) * 1.5])
+    #ax1.set_ylim([0.0, awkward.max(original) * 1.5])
 
     if log_y:
         ax1.set_yscale("log")

@@ -18,7 +18,7 @@ else:
 if args.detector:
     detector = args.detector
 else:
-    print("Please provide detector")
+    print("Please provide the data set family (e.g. L1T, Muon) using the -d flag.")
     exit()
 
 # Load the JSON data from the file
