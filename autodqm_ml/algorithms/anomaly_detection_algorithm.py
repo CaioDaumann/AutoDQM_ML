@@ -98,31 +98,27 @@ class AnomalyDetectionAlgorithm():
             if "normalize" in histogram_info.keys():
                 if histogram_info["normalize"]:
                     if histogram_info["n_dim"] == 2:
-                        #print(df[histogram])
-                        print("START OF REBINNING")
-                        print(len(df[histogram]),len(df[histogram][0]),len(df[histogram][0][0]))
+                        '''
+                        sum = awkward.sum(df[histogram], axis = -1)
+                        sum = awkward.sum(sum, axis = -1)
+                        df[histogram] = df[histogram] * (1. / sum)
+                        '''
+                        #print(len(df[histogram]),len(df[histogram][0]),len(df[histogram][0][0]))
                         logger.debug("[anomaly_detection_algorithm : load_data] Rebinning and normalising the 2D histogram '%s'" % histogram)
                         df[histogram] = rebinning_min_occupancy(df[histogram], 0.001)
-                        #print(df[histogram])
                         new_shape = (len(df[histogram][0]),)
                         self.histograms[histogram]["shape"] = new_shape
                         self.histograms[histogram]["n_dim"] = len(new_shape)
                         self.histograms[histogram]["n_bins"] = len(df[histogram][0])
-                        #print(new_shape)
-                        #print(self.histograms[histogram]["n_bins"])
                     else:
                         sum = awkward.sum(df[histogram], axis = -1)
-                        #print(self.histograms[histogram]["shape"])
                         logger.debug("[anomaly_detection_algorithm : load_data] Normalising the 1D histogram '%s' by the sum of total entries." % histogram)
                         df[histogram] = df[histogram] * (1. / sum)
-            #self.histograms[histogram]["shape"]
 
         self.n_train = awkward.sum(df.label == 0)
         self.n_bad_runs = awkward.sum(df.label != 0)
         self.df = df
         self.n_histograms = len(list(self.histograms.keys()))
-        #print(self.histograms.keys())
-        #print(self.histograms)
 
         logger.debug("[AnomalyDetectionAlgorithm : load_data] Loaded data for %d histograms with %d events in training set, excluding the %d bad runs." % (self.n_histograms, self.n_train, self.n_bad_runs))
 

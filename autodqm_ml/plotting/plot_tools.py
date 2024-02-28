@@ -15,6 +15,8 @@ from datetime import datetime
 import logging
 logger = logging.getLogger(__name__)
 
+universal_font_size = 12
+
 def make_sse_plot(name, recos, save_name, **kwargs):
     x_label = "Anomaly Score"
     y_label = "Fraction of runs"
@@ -39,8 +41,8 @@ def make_sse_plot(name, recos, save_name, **kwargs):
     for idx, h in enumerate(hists):
         h.plot(ax=ax, color = "C%d" % (idx+1), errors = True, linewidth=2)
 
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
+    ax.set_xlabel(x_label, fontsize = universal_font_size)
+    ax.set_ylabel(y_label, fontsize = universal_font_size)
     ax.set_xscale("log")
     ax.set_yscale("log")
 
@@ -102,19 +104,20 @@ def make_original_vs_reconstructed_plot1d(name, original, recos, run, save_name,
     plt.sca(ax1)
 
     for idx, h in enumerate(h_reco):
-        if "pca" in save_name: idx = idx
-        if ("ae" in save_name) or ("autoencoder" in save_name): idx = idx + 1
+        if "pca" in save_name.lower(): idx = idx + 1
+        if ("ae" in save_name.lower()) or ("autoencoder" in save_name.lower()): idx = idx
+        h.plot(ax=ax1, color = "C%d" % (idx+1), errors = False, linewidth=2)
 
     for idx, h in enumerate(h_reco):
-        if "pca" in save_name: idx = idx
-        if ("ae" in save_name) or ("autoencoder" in save_name): idx = idx + 1
+        if "pca" in save_name.lower(): idx = idx + 1
+        if ("ae" in save_name.lower()) or ("autoencoder" in save_name.lower()): idx = idx
         ratio = h.divide(h_orig)
         ratio.metadata["label"] = None
         ratio.plot(ax=ax2, color = "C%d" % (idx+1), errors = False, linewidth=2)
 
-    ax1.set_ylabel(y_label)
-    ax2.set_ylabel("ML Reco / Original")
-    ax2.set_xlabel(x_label)
+    ax1.set_ylabel(y_label, fontsize = universal_font_size)
+    ax2.set_ylabel("Reco / Original", fontsize = universal_font_size)
+    ax2.set_xlabel(x_label, fontsize = universal_font_size)
     ax2.set_ylim(rat_lim)
     #ax1.set_ylim([0.0, awkward.max(original) * 1.5])
 
@@ -178,9 +181,9 @@ def make_original_vs_reconstructed_plot2d(name, original, recos, run, save_name,
         axes[0][idx+1].grid()
         axes[1][idx+1].grid()
     axes[1][0].remove()
-    axes[0][0].set_ylabel(y_label)
+    axes[0][0].set_ylabel(y_label, fontsize = universal_font_size)
     axes[1][1].set_ylabel("ML Reco - Original")
-    axes[0][0].set_xlabel(x_label)
+    axes[0][0].set_xlabel(x_label, fontsize = universal_font_size)
 
 
     logger.debug("[plot_tools.py : make_original_vs_reconstructed_plot1d] Writing plot to file '%s'. " % (save_name))
@@ -268,7 +271,7 @@ def plotMSESummary(original_hists, reconstructed_hists, threshold, hist_paths, r
     sortIdx = np.argsort(mse)
 
     hist,_, _ = ax.hist(mse)
-    ax.set_xlabel('MSE values') 
+    ax.set_xlabel('MSE values', fontsize = universal_font_size) 
     ax.set_title('Summary of all MSE values')
     
     numHistText = [f'num good hists: {num_good_hists}', f'num bad hists: {num_bad_hists}']
@@ -369,7 +372,7 @@ def plot_rescaled_score_hist(data, hist, savename):
     
 def make_training_plots(history, hist, save_file):
         epochs = range(len(history['loss']))
-        print(len(history.columns))
+        #print(len(history.columns))
         fig, axes = plt.subplots(1, len(history.columns), figsize = (len(history.columns)*9, 9))
         i = 0
         fig.suptitle(hist, fontsize = 22)
@@ -397,7 +400,7 @@ def multi_exp_plots(paths, xlabel, x, title, legend = None, logx = False, logy =
         for c in '()[]{}/.,:;?!@#$^&*':
             filename = filename.replace(c, '')
         savepath = savepath[:str.rindex(savepath, '/')] + '/' + filename + '_plots.png'
-        print(savepath)
+        #print(savepath)
     else:
         make_one_var_exp_plots(paths, xlabel, x, axes, legend, logx)
         plt.savefig(paths + 'plots.png', bbox_inches = 'tight')
@@ -459,7 +462,7 @@ def multi_exp_bar_plots(paths, xlabel, title, legend = None):
         for c in '()[]{}/.,:;?!@#$^&*':
             filename = filename.replace(c, '')
         savepath = savepath[:str.rindex(savepath, '/')] + '/' + filename + '_plots.png'
-        print(savepath)
+        #print(savepath)
     else:
         
         make_one_var_exp_bar_plots(paths, xlabel, axes, 0, b, s, 1, legend[0])

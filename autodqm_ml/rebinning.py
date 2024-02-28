@@ -132,7 +132,7 @@ def rebinning_min_occupancy(df_ver_hist, min_occ_threshold):
     assert_allclose(sum(combined_hist), len(hist), atol=1e-3)
 
     track_merges = []
-    new_comb_hist, track_merges = merge_below_threshold_with_indices(combined_hist, min_occ_threshold * len(hist[0]) * len(hist[0][0]))
+    new_comb_hist, track_merges = merge_below_threshold_with_indices(combined_hist, min_occ_threshold * len(hist))
     #print("STARTING FULL MANIPULATION PROGRAMMING")
     #print("ORIGINAL HISTOGRAM DIMENSIONS MULITPLIED: ",len(hist[0])*len(hist[0][0]))
     #print("LENGTH OF MODIFIED HISTOGRAM THAT SURVIVES THRESHOLD SELECTION: ", len(new_comb_hist))

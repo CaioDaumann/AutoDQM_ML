@@ -153,10 +153,11 @@ def main(args):
                 score_hist_data['algo'].append(algorithm)
                 score_hist_data['score'].append(runs[algorithm_info["score"]][runs['label'] == 0])
                 score_hist_data['bad'].append(runs[algorithm_info["score"]][runs['label'] == 1])
-        if not os.path.isdir(args.output_dir + "/" + h.replace("/", "").replace(" ", "") + "/"):
-            os.mkdir(args.output_dir + "/" + h.replace("/", "").replace(" ", "") + "/")
+        h = '_'.join(h.split("/")[3:])
+        if not os.path.isdir(args.output_dir + "/" + h + "/"):
+            os.mkdir(args.output_dir + "/" + h + "/")
         if len(score_hist_data['algo']) != 0:
-            plot_rescaled_score_hist(score_hist_data, h, args.output_dir + "/" + h.replace("/", "").replace(" ", "") + "/" + "score_hist.png")
+            plot_rescaled_score_hist(score_hist_data, h, args.output_dir + "/" + h + "/" + "score_hist.png")
     # Histogram of sse for algorithms
     splits = {
             "label" : [("train", 0), ("test", 1)]}
@@ -172,8 +173,7 @@ def main(args):
                 for algorithm, algorithm_info in info["algorithms"].items():
                     recos[algorithm] = { "score" : runs_set[algorithm_info["score"]] }
                     recos_by_label[algorithm][name] = { "score" : runs_set[algorithm_info["score"]] }
-
-                h_name = h.replace("/", "").replace(" ", "")
+                h_name = '_'.join(h.split("/")[3:])
                 save_name = args.output_dir + "/" + h_name + "/sse_%s_%s.pdf" % (split, name)
                 make_sse_plot(h_name, recos, save_name)
 
@@ -201,7 +201,7 @@ def main(args):
                 pred = labeled_runs[algorithm_info["score"]]
                 roc_results[h][algorithm] = calc_roc_and_unc(labeled_runs['label'], pred)
 
-            h_name = h.replace("/", "").replace(" ", "")
+            h_name = '_'.join(h.split("/")[3:])
             save_name = args.output_dir + "/" + h_name + "/roc.pdf"
             plot_roc_curve(h_name, roc_results[h], save_name)
             plot_roc_curve(h_name, roc_results[h], save_name.replace(".pdf", "_log.pdf"), log = True)
@@ -243,7 +243,7 @@ def main(args):
                         stats['dim_0'].append(len(run[algorithm_info["reco"]]))
                         stats['dim_1'].append(numpy.nan)
             stats_checked = True
-            h_name = h.replace("/", "").replace(" ", "")
+            h_name = '_'.join(h.split("/")[3:])
             save_name = args.output_dir + "/" + h_name + "/Run%d.pdf" % run_number
             make_original_vs_reconstructed_plot(h_name, original, recos, run_number, save_name, hist_layout = args.hist_layout) 
 
