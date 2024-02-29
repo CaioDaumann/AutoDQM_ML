@@ -35,11 +35,11 @@ def count_instances_before_first_pair_changes(arr):
 
     return count, new_array
 
-def count_instances_before_last_pair_changes(arr):
+def count_instances_before_last_pair_changes(arr,hist_len):
     if not arr:
         return 0, []
 
-    if (arr[0] != (len(arr) - 1,len(arr))):
+    if (arr[-1] != (hist_len - 2,hist_len - 1)):
         return 0, arr
 
     count = 0
@@ -137,11 +137,9 @@ def rebinning_min_occupancy(df_ver_hist, min_occ_threshold):
     #print("ORIGINAL HISTOGRAM DIMENSIONS MULITPLIED: ",len(hist[0])*len(hist[0][0]))
     #print("LENGTH OF MODIFIED HISTOGRAM THAT SURVIVES THRESHOLD SELECTION: ", len(new_comb_hist))
     #print('NUMBER OF INTENDED TRACK MERGES: ', len(track_merges))
-
-    #print(track_merges[:10])
-    #print(track_merges[-10:])
+    #print(len(track_merges))
     number_of_first_empty, track_merges = count_instances_before_first_pair_changes(track_merges)
-    number_of_last_empty, track_merges = count_instances_before_last_pair_changes(track_merges)
+    number_of_last_empty, track_merges = count_instances_before_last_pair_changes(track_merges,len(combined_hist))
     #print('HAVING COUNTED THE NUMBER OF START AND END VALUES IN HISTOGRAM TO FAST-MERGE: (SHOULD BE FLATTENED HIST LENGTH LESS', number_of_first_empty + number_of_last_empty,'):', len(track_merges))
 
     #print("MERGING FIRST AND LAST BINS AND REMOVING THEM, BEFORE AND AFTER LENGTHS ARE:")
@@ -153,6 +151,5 @@ def rebinning_min_occupancy(df_ver_hist, min_occ_threshold):
     #print("BEFORE FULL MERGE, HISTOGRAMS ARE OF LENGTH ",len(flattened_hist[0]))
     merged_flattened_hist = merge_bins_in_arrays(flattened_hist, track_merges, number_of_first_empty)
     #print("AFTER FULL MERGE, HISTOGRAMS ARE OF LENGTH ",len(merged_flattened_hist[0]))
-    #print(merged_flattened_hist)
 
     return merged_flattened_hist

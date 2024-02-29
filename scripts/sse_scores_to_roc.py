@@ -105,6 +105,9 @@ def main(args):
   cutoffs_across_hists = np.array(cutoffs_across_hists)
 
   N_bad_hists = [5,3,1]
+  #N_bad_hists = [3,2,1]
+  #N_bad_hists = [15,10,5]
+  #N_bad_hists = [30,20,10]
   tFRF_ROC_good_X = []
   tFRF_ROC_bad_Y = []
 
@@ -147,8 +150,8 @@ def main(args):
   # commented out but keep for the aggregated scores plots
   #for jj in range(len(N_bad_hists)):
   #  print(N_bad_hists[jj])
-  #  print(tFRF_ROC_good_X[jj])
-  #  print(tFRF_ROC_bad_Y[jj])
+  #  print("C"+str(jj+1)+"X = "+str(tFRF_ROC_good_X[jj]))
+  #  print("C"+str(jj+1)+"Y = "+str(tFRF_ROC_bad_Y[jj]))
   axs[1].plot(tFRF_ROC_good_X[0],tFRF_ROC_bad_Y[0], '-rD', mfc='purple', mec='k', markersize=8, linewidth=1, label='SSE thresholds, N = ' + str(N_bad_hists[0]))
   axs[1].plot(tFRF_ROC_good_X[1],tFRF_ROC_bad_Y[1], '-bo', mfc='yellow', mec='k', markersize=8, linewidth=1, label='SSE thresholds, N = ' + str(N_bad_hists[1]))
   axs[1].plot(tFRF_ROC_good_X[2],tFRF_ROC_bad_Y[2], '-g^', mfc='orange', mec='k', markersize=8, linewidth=1, label='SSE thresholds, N = ' + str(N_bad_hists[2]))
