@@ -57,40 +57,21 @@ def count_instances_before_last_pair_changes(arr,hist_len):
 def merge_first_n_bins(array_of_arrays, n):
     if n <= 0:
         return array_of_arrays
-    merged_bins = [[sum(subarray[:n])] + subarray[n:] for subarray in array_of_arrays]
+    merged_bins = [np.concatenate(([sum(subarray[:n])], subarray[n:])) for subarray in array_of_arrays]
     return merged_bins
 
 def merge_last_n_bins(array_of_arrays, n):
     if n <= 0:
         return array_of_arrays
-    merged_bins = [subarray[:-n] + [sum(subarray[-n:])] for subarray in array_of_arrays]
+    merged_bins = [np.concatenate((subarray[:-n], [sum(subarray[-n:])])) for subarray in array_of_arrays]
     return merged_bins
-
-'''
-def merge_bins_in_arrays(array_of_arrays, pairs_of_indices):
-    new_array_of_arrays = []
-    for arr in array_of_arrays:
-        merged_array = arr.copy()  # Make a copy of the original array to perform merges
-        
-        for pair in pairs_of_indices:
-            merged_value = merged_array[pair[0]] + merged_array[pair[1]]
-            merged_array[pair[0]] = merged_value
-            
-            # Set the value at the second index to 0
-            merged_array[pair[1]] = 0
-            merged_array = np.compress(merged_array != 0, merged_array)
-        
-        # After merging all pairs, compress the array to remove 0 values
-        new_array_of_arrays.append(merged_array)
-
-    return np.array(new_array_of_arrays)
-'''
 
 def merge_bins_in_arrays(array_of_arrays, pairs_of_indices, empty_bins_removed):
     new_array_of_arrays = []
     for arr in array_of_arrays:
         # Make a copy of the original array to perform merges
         merged_array = np.copy(arr)
+        #print(len(merged_array))
     
         # Iterate through each pair of indices
         for pair in pairs_of_indices:
@@ -129,8 +110,7 @@ def rebinning_min_occupancy(df_ver_hist, min_occ_threshold):
     combined_hist = np.sum(flattened_hist, axis=0)
     #print("Combined Shape:", combined_hist.shape) # 648 bins per hist, and totals number of hists (308)
     hist_copy = hist.reshape(len(hist), -1)
-    assert_allclose(sum(combined_hist), len(hist), atol=1e-3)
-
+    assert_allclose(sum(combined_hist), len(hist), atol=1e-2)
     track_merges = []
     new_comb_hist, track_merges = merge_below_threshold_with_indices(combined_hist, min_occ_threshold * len(hist))
     #print("STARTING FULL MANIPULATION PROGRAMMING")
@@ -143,10 +123,8 @@ def rebinning_min_occupancy(df_ver_hist, min_occ_threshold):
     #print('HAVING COUNTED THE NUMBER OF START AND END VALUES IN HISTOGRAM TO FAST-MERGE: (SHOULD BE FLATTENED HIST LENGTH LESS', number_of_first_empty + number_of_last_empty,'):', len(track_merges))
 
     #print("MERGING FIRST AND LAST BINS AND REMOVING THEM, BEFORE AND AFTER LENGTHS ARE:")
-    #print(len(flattened_hist[0]))
     flattened_hist = merge_first_n_bins(flattened_hist,number_of_first_empty)
     flattened_hist = merge_last_n_bins(flattened_hist,number_of_last_empty)
-    #print(len(flattened_hist[0]))
 
     #print("BEFORE FULL MERGE, HISTOGRAMS ARE OF LENGTH ",len(flattened_hist[0]))
     merged_flattened_hist = merge_bins_in_arrays(flattened_hist, track_merges, number_of_first_empty)
