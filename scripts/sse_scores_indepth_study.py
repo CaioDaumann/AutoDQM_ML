@@ -48,12 +48,14 @@ def count_number_of_hists_above_threshold(Fdf, Fthreshold_list):
 def count_mean_runs_above(Fdf, Fthreshold_list, type, single):
   hists_flagged_per_run = count_number_of_hists_above_threshold(Fdf, Fthreshold_list)
   if (sum(hists_flagged_per_run) > 1.5 * len(Fdf['run_number'])) & (type == "good") & (single == 1):
-    print("MH " + type)
-    print(Fthreshold_list)
-    print(hists_flagged_per_run)
+    print("[COUNT_MEAN_RUNS_ABOVE] Tracing the SSE score thresholds for each histogram at the HF data point")
+    for entry in Fthreshold_list: print(str(entry) + ",")
     single = 0
+  #  print("[COUNT_MEAN_RUNS_ABOVE] Number of histogram flags for each run")
+  #  print(hists_flagged_per_run)
+  #  single = 0
   mean_hists_flagged_per_run = sum(hists_flagged_per_run) / len(Fdf['run_number'])
-  print(mean_hists_flagged_per_run)
+  #print(mean_hists_flagged_per_run)
   return mean_hists_flagged_per_run, single
 
 # returns fraction of runs with SSE above the given threshold
@@ -61,9 +63,10 @@ def count_fraction_runs_above(Fdf, Fthreshold_list, N_bad_hists, type, single):
   hists_flagged_per_run = count_number_of_hists_above_threshold(Fdf, Fthreshold_list)
   count = len([i for i in hists_flagged_per_run if i > N_bad_hists])
   if (N_bad_hists == 3) & (count > 0.1 * len(Fdf['run_number'])) & (type == "good") & (single == 1):
-    print("FR " + type)
-    print(Fthreshold_list)
-    print(hists_flagged_per_run)
+    print("[COUNT_FRACTIONS_RUNS_ABOVE] Tracing the SSE score thresholds for each histogram at the RF data point")
+    for entry in Fthreshold_list: print(str(entry) + ",")
+    #print("[COUNT_FRACTIONS_RUNS_ABOVE] Followed by number of histogram flags for each good run")
+    #print(hists_flagged_per_run)
     single = 0
   count_per_run = count / len(Fdf['run_number'])
   return count_per_run, single
@@ -115,6 +118,8 @@ def main(args):
   sse_df_good = sse_df_good[['run_number'] + hist_cols]
   sse_df_bad = sse_df_bad[['run_number'] + hist_cols]
 
+  print("[LOGGER] Calculating SSE thresholds for each histogram for algorithm :" + algorithm_name)
+
   cutoffs_across_hists = []
   for histogram in hist_cols:
     sse_ordered = sorted(sse_df_good[histogram], reverse=True)
@@ -127,29 +132,24 @@ def main(args):
     cutoffs_across_hists.append(cutoff_thresholds)
 
   cutoffs_across_hists = np.array(cutoffs_across_hists)
+  print("[LOGGER] There are " + str(len(cutoffs_across_hists)) + " histograms, " + str(len(sse_df_good['run_number'])) + " good runs and " + str(len(sse_df_bad['run_number']))  + " bad runs")
 
-  #N_bad_hists = [5,3,1]
-  N_bad_hists = [3]
+  print("[LOGGER] Counting the number of histogram flags at FR threshold > 0.1, N = 3")
+
+  nbh_ii = 3
   tFRF_ROC_good_X = []
   tFRF_ROC_bad_Y = []
+  single = 1
+  for cutoff_index in range(len(cutoffs_across_hists[0,:])):
+    #if nbh_ii == 3: print("HERE:" + str(cutoff_index))
+    t_cutoff_index_g_FRF_rc, single = count_fraction_runs_above(sse_df_good, cutoffs_across_hists[:,cutoff_index], nbh_ii, "good", single)
+    t_cutoff_index_b_FRF_rc, single = count_fraction_runs_above(sse_df_bad, cutoffs_across_hists[:,cutoff_index], nbh_ii, "bad", single)
+    tFRF_ROC_good_X.append(t_cutoff_index_g_FRF_rc)
+    tFRF_ROC_bad_Y.append(t_cutoff_index_b_FRF_rc)
+    if single == 0: break
 
-  for nbh_ii in N_bad_hists:
-    tFRF_ROC_good_X_init = []
-    tFRF_ROC_bad_Y_init = []
-    single = 1
-    for cutoff_index in range(len(cutoffs_across_hists[0,:])):
-      #if nbh_ii == 3: print("HERE:" + str(cutoff_index))
-      t_cutoff_index_g_FRF_rc, single = count_fraction_runs_above(sse_df_good, cutoffs_across_hists[:,cutoff_index], nbh_ii, "good", single)
-      t_cutoff_index_b_FRF_rc, single = count_fraction_runs_above(sse_df_bad, cutoffs_across_hists[:,cutoff_index], nbh_ii, "bad", single)
-      tFRF_ROC_good_X_init.append(t_cutoff_index_g_FRF_rc)
-      tFRF_ROC_bad_Y_init.append(t_cutoff_index_b_FRF_rc)
-
-    tFRF_ROC_good_X_init = sorted(tFRF_ROC_good_X_init)
-    tFRF_ROC_bad_Y_init = sorted(tFRF_ROC_bad_Y_init)
-
-    tFRF_ROC_good_X.append(tFRF_ROC_good_X_init)
-    tFRF_ROC_bad_Y.append(tFRF_ROC_bad_Y_init)
-    
+  tFRF_ROC_good_X = sorted(tFRF_ROC_good_X)
+  tFRF_ROC_bad_Y = sorted(tFRF_ROC_bad_Y)
 
   tMHF_ROC_good_X = []
   tMHF_ROC_bad_Y = []
@@ -160,30 +160,31 @@ def main(args):
     t_cutoff_index_b_MHF_rc, single = count_mean_runs_above(sse_df_bad, cutoffs_across_hists[:,cutoff_index], "bad", single)
     tMHF_ROC_good_X.append(t_cutoff_index_g_MHF_rc)
     tMHF_ROC_bad_Y.append(t_cutoff_index_b_MHF_rc)
+    if single == 0: break
 
-  print("AFTER THE FUNCTIONS")
   #print(tMHF_ROC_good_X)
-
   tMHF_ROC_good_X = sorted(tMHF_ROC_good_X)
   tMHF_ROC_bad_Y = sorted(tMHF_ROC_bad_Y)
 
 
   #algo = "pca"
-  algo = "ae"
+  algo = "pca"
   if algo == "pca":
-    thresholds_mh = [1.23321025e-06,1.50930279e-05,1.49286891e-04,1.88155069e-04,1.37752523e-04,1.47867315e-04,7.83042127e-05,2.28385199e-04,6.30925470e-04,6.77197251e-04,7.76971854e-05,1.12812445e-03,1.67914317e-04,3.17847931e-03,4.77704011e-05,3.28967227e-04,1.78754919e-04,1.02633538e-03,1.78704300e-04,1.84717121e-04,1.47557857e-04,1.67662806e-04,1.49062244e-04,1.49726581e-04,1.67555471e-04,1.33698367e-04,2.76963667e-04,1.42156407e-04,2.53627973e-04,5.84408675e-04,8.82823846e-04,9.84422267e-04,3.79128118e-04,5.85359283e-04,1.04462715e-03,9.89620541e-04,2.16569021e-04,3.92015482e-05,4.10701618e-02,4.30546707e-02,5.91853398e-03,6.71062478e-03,3.29411974e-03,3.51575081e-03,9.57488908e-03,1.26203323e-02,2.59618679e-02,3.55206677e-02,3.81228905e-02,5.28686726e-02,4.57241002e-03,3.22627175e-03,5.30213895e-03,3.74273862e-03,1.00866140e-02,8.54201608e-03,1.21205140e-02,1.08614010e-02,1.56596262e-02,1.42228641e-02,1.89596373e-02,1.74686020e-02]
-    thresholds_fr = [1.33880645e-06,1.71005517e-05,2.07432838e-04,2.66117342e-04,1.53229424e-04,1.74173277e-04,8.90376781e-05,2.56020621e-04,7.37766365e-04,7.51130839e-04,9.92637028e-05,1.21253016e-03,2.07025065e-04,4.68996706e-03,5.05289716e-05,4.29786637e-04,2.03680806e-04,1.22143826e-03,2.29235532e-04,2.26782300e-04,1.70092400e-04,1.90973911e-04,1.95007126e-04,2.04282311e-04,2.13468611e-04,1.69465104e-04,3.49285997e-04,1.69873415e-04,3.38607530e-04,6.96611175e-04,9.32676717e-04,1.10196514e-03,6.60170297e-04,6.76419962e-04,1.22296337e-03,1.10896094e-03,2.34616131e-04,4.75172914e-05,5.61562970e-02,5.29765262e-02,7.74857577e-03,8.63094534e-03,3.67583637e-03,4.51919091e-03,1.21420367e-02,1.48391655e-02,3.45248856e-02,3.87003590e-02,4.67129799e-02,5.66864263e-02,5.73300184e-03,3.73491494e-03,6.19481455e-03,4.59445989e-03,1.37037914e-02,1.07576198e-02,1.49759833e-02,1.21937127e-02,1.91201691e-02,1.80337773e-02,2.05148831e-02,1.95208514e-02]
+    thresholds_mh = [1.33880645e-06,1.71567021e-05,2.07432838e-04,2.66117342e-04,1.53229424e-04,1.55259134e-04,7.96096127e-05,2.56020621e-04,7.21273529e-04,7.51130839e-04,8.94609148e-05,1.21253016e-03,1.82645994e-04,4.68996706e-03,3.04298805e-05,4.29786637e-04,1.97987234e-04,1.22143826e-03,2.29235532e-04,2.26782300e-04,1.70092400e-04,1.90973911e-04,1.95007126e-04,2.04282311e-04,2.13468611e-04,1.69465104e-04,3.49285997e-04,1.69873415e-04,3.38607530e-04,6.96611175e-04,9.32676717e-04,1.10196514e-03,6.60170297e-04,6.76419962e-04,1.22296337e-03,1.10896094e-03,2.34616131e-04,4.75172914e-05,5.61562970e-02,5.29765262e-02,6.42649239e-03,8.03505818e-03,3.62255976e-03,4.34978594e-03,1.19777153e-02,1.40878144e-02,3.25955373e-02,3.77295784e-02,4.55771287e-02,5.45613752e-02,5.30430759e-03,3.64479532e-03,5.89764503e-03,4.54672408e-03,1.28201471e-02,1.00821667e-02,1.42514024e-02,1.16427332e-02,1.82288481e-02,1.58886293e-02,1.91253485e-02,1.83733684e-02]
+    thresholds_fr = [1.23321025e-06,1.49943958e-05,1.49286891e-04,1.88155069e-04,1.37752523e-04,1.41880690e-04,6.42989790e-05,2.28385199e-04,6.13848811e-04,6.77197251e-04,7.61906472e-05,1.12812445e-03,1.48219262e-04,3.17847931e-03,2.54402776e-05,3.28967227e-04,1.73371775e-04,1.02633538e-03,1.78704300e-04,1.84717121e-04,1.47557857e-04,1.67662806e-04,1.49062244e-04,1.49726581e-04,1.67555471e-04,1.33698367e-04,2.76963667e-04,1.42156407e-04,2.53627973e-04,5.84408675e-04,8.82823846e-04,9.84422267e-04,3.79128118e-04,5.85359283e-04,1.04462715e-03,9.89620541e-04,2.16569021e-04,3.92015482e-05,4.10701618e-02,4.30546707e-02,5.89479274e-03,6.98787478e-03,3.11337826e-03,3.60097170e-03,9.78355221e-03,1.23230026e-02,2.46475766e-02,3.25677169e-02,3.77774200e-02,5.13555984e-02,4.31542490e-03,3.14183580e-03,4.97391103e-03,3.35085450e-03,9.48770967e-03,8.02717054e-03,1.15562015e-02,1.01348733e-02,1.45747964e-02,1.39596159e-02,1.68925103e-02,1.63308314e-02]
   
   if algo == "ae":
-    thresholds_mh = [3.43235308e-04,6.32704961e-05,1.21560002e-02,1.10584158e-03,2.49256570e-04,1.72538927e+00,8.90918916e+06,4.04723681e-03,1.13164362e+07,7.90779055e-03,1.37364361e+06,2.10385729e-02,9.48842615e+02,2.51544865e-02,9.26887607e+05,2.67243432e-02,2.84718639e+06,7.35490642e-03,2.24029017e-03,3.90413689e-03,2.82017854e-02,3.12499911e-03,2.35614017e-04,1.37801106e-02,2.79267887e-04,2.82977162e-01,4.45697806e-04,1.98522037e-02,3.85285611e-04,5.93037919e-03,1.57751789e-03,1.24156223e-03,5.78747791e-03,1.63056218e-03,1.26515594e-03,1.22085912e-03,4.32205942e-04,1.20878434e-04,7.72103765e-02,6.23229780e-02,1.06981523e-01,1.65030603e-02,1.04873488e-01,2.41992558e-02,2.93121238e-02,5.88366336e-02,4.14468502e-02,7.06497670e-02,1.81868000e-01,5.17372589e-01,6.04952044e-03,4.33471317e-02,7.60607355e-02,9.05287890e-03,1.25771026e-01,1.23315050e-02,4.13688186e-01,2.21849840e+01,1.70747272e-01,2.02735651e-01,7.79511363e+01,8.07983347e+01]
-    thresholds_fr = [3.45784982e-04,7.18441549e-05,1.32854789e-02,1.29294316e-03,2.66538588e-04,2.22242527e+00,9.47408080e+06,4.18054456e-03,1.27242410e+07,7.99147306e-03,1.73384307e+06,2.17228089e-02,1.13181223e+03,3.00884209e-02,9.43803204e+05,2.76265196e-02,3.34901870e+06,7.74733924e-03,2.28152040e-03,3.95771757e-03,3.21016176e-02,3.26686532e-03,2.48405074e-04,1.40528112e-02,2.97953845e-04,2.95177950e-01,4.89878585e-04,2.33485642e-02,4.68326525e-04,6.06619073e-03,1.81558892e-03,1.29455791e-03,6.22331421e-03,2.16641479e-03,1.36219487e-03,1.39317963e-03,4.40724532e-04,1.22319700e-04,8.41518050e-02,6.95396490e-02,1.08259410e-01,1.84118339e-02,1.19769289e-01,4.17237221e-02,3.71517175e-02,7.11543543e-02,5.15580223e-02,1.24368375e-01,2.24870679e-01,8.16979036e-01,8.53139196e-03,1.01338313e-01,8.81065211e-02,9.91997432e-03,2.36691047e-01,1.40691508e-02,4.81930945e-01,2.36482632e+01,3.53155503e-01,4.13411270e-01,1.03975066e+02,9.57220059e+01]
+    thresholds_mh = [3.43235308e-04,6.62314856e-05,9.85145902e-03,1.05648505e-03,1.58853967e-03,1.89324233e-04,1.09722362e-04,3.50171594e-03,7.75700216e-04,4.23791384e-03,4.12679020e-04,2.05688427e-02,3.04456103e-04,2.59582113e-02,1.95408631e-04,2.72414456e-02,2.73722362e-04,6.89270544e-03,2.24029017e-03,3.90413689e-03,2.82081729e-01,8.77772082e-04,2.32376275e-04,1.49818297e-03,2.72066078e-04,2.37863248e-02,4.28827785e-04,2.85802584e-02,3.82918177e-04,4.15537740e-03,1.35855561e-03,1.25847083e-03,7.39616055e-03,1.64155478e-03,1.26473719e-03,1.16164908e-03,1.45719745e-03,1.44145096e-04,7.71774847e-02,6.28571785e-02,8.15585082e-03,9.73947628e-03,3.95112632e-03,4.74834296e-03,1.39885435e-02,1.56613237e-02,3.52744863e-02,3.94445789e-02,5.36912058e-02,6.61840856e-02,6.15910197e-03,4.40185316e-03,6.54050092e-03,4.93548246e-03,1.49373987e-02,1.17950470e-02,1.65506627e-02,1.36560220e-02,2.27486150e-02,1.86681047e-02,2.20956146e-02,2.03984596e-02]
+    thresholds_fr = [3.43235308e-04,6.62314856e-05,9.85145902e-03,1.05648505e-03,1.58853967e-03,1.89324233e-04,1.09722362e-04,3.50171594e-03,7.75700216e-04,4.23791384e-03,4.12679020e-04,2.05688427e-02,3.04456103e-04,2.59582113e-02,1.95408631e-04,2.72414456e-02,2.73722362e-04,6.89270544e-03,2.24029017e-03,3.90413689e-03,2.82081729e-01,8.77772082e-04,2.32376275e-04,1.49818297e-03,2.72066078e-04,2.37863248e-02,4.28827785e-04,2.85802584e-02,3.82918177e-04,4.15537740e-03,1.35855561e-03,1.25847083e-03,7.39616055e-03,1.64155478e-03,1.26473719e-03,1.16164908e-03,1.45719745e-03,1.44145096e-04,7.71774847e-02,6.28571785e-02,8.15585082e-03,9.73947628e-03,3.95112632e-03,4.74834296e-03,1.39885435e-02,1.56613237e-02,3.52744863e-02,3.94445789e-02,5.36912058e-02,6.61840856e-02,6.15910197e-03,4.40185316e-03,6.54050092e-03,4.93548246e-03,1.49373987e-02,1.17950470e-02,1.65506627e-02,1.36560220e-02,2.27486150e-02,1.86681047e-02,2.20956146e-02,2.03984596e-02]
 
-  #metric = "fr"
-  metric = "mh"
+  metric = "fr"
+  #metric = "mh"
   if metric == "fr":
     thresholds_to_study = thresholds_fr
   if metric == "mh":
     thresholds_to_study = thresholds_mh
+
+  print("[LOGGER] Now calculating the number of histogram flags per good and bad run, with algorithm " + algo.upper() + " and metric " + metric.upper() + " options selected")
 
   run_flags_good = count_run_most_flags(sse_df_good,thresholds_to_study)
   run_flags_bad = count_run_most_flags(sse_df_bad,thresholds_to_study)
@@ -217,7 +218,7 @@ def main(args):
     
     print(f"Run {run}:")
     for hist in histograms:
-        print(hist[17:-15])
+        print(hist[17:(-14 - len(algo))])
     print()
   
 
@@ -270,13 +271,16 @@ def main(args):
   result_df_fr_bad = pd.DataFrame(result_data_fr_bad)
   result_df_bad = pd.merge(result_df_mh_bad, result_df_fr_bad, on='Histogram')
 
+
+  print("[LOGGER] Now calculating the frequency at which histograms are flagged in bad run, as flagged by the " + algo.upper() + " algorithm")
+  print(result_df_bad[["MH","FR"]].to_string(index=False, sep=','))
   result_df_bad.to_csv('./hist_flag_freq_bad_runs_'+algo+'.csv', index=False)
 
   index_mh1p5 = find_closest_index(tMHF_ROC_good_X, 1.5)
   dist_of_sse_at_mh1p5 = np.array([sub_array[index_mh1p5] for sub_array in cutoffs_across_hists])
   log_scale_mh1p5 = np.log10(dist_of_sse_at_mh1p5)
 
-  index_rf0p1 = find_closest_index(tFRF_ROC_good_X[1], 0.1)
+  index_rf0p1 = find_closest_index(tFRF_ROC_good_X, 0.1)
   dist_of_sse_at_rf0p1 = np.array([sub_array[index_rf0p1] for sub_array in cutoffs_across_hists])
   log_scale_rf0p1 = np.log10(dist_of_sse_at_rf0p1)
 

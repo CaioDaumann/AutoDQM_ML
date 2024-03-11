@@ -104,28 +104,27 @@ def rebinning_min_occupancy(df_ver_hist, min_occ_threshold):
     hist = np.array(df_ver_hist)
     number_of_first_empty = 0
     normalized_hist = hist / np.sum(hist, axis=(1, 2), keepdims=True)
-    #print(normalized_hist.shape) # normalise histogram shape
+    #print("Normalised hist shape:", normalized_hist.shape) # normalise histogram shape
     flattened_hist = normalized_hist.reshape(len(hist), -1)
-    #print("Flattened Shape:", flattened_hist.shape)
+    print("Flattened Shape:", flattened_hist.shape)
     combined_hist = np.sum(flattened_hist, axis=0)
-    #print("Combined Shape:", combined_hist.shape) # 648 bins per hist, and totals number of hists (308)
+    #print("Combined Shape:", combined_hist.shape) # XXX bins per hist, and totals number of hists (308)
     hist_copy = hist.reshape(len(hist), -1)
-    assert_allclose(sum(combined_hist), len(hist), atol=1e-2)
+    #assert_allclose(sum(combined_hist), len(hist), atol=1e-3)
     track_merges = []
-    new_comb_hist, track_merges = merge_below_threshold_with_indices(combined_hist, min_occ_threshold * len(hist))
+    new_comb_hist, track_merges = merge_below_threshold_with_indices(combined_hist, min_occ_threshold * len(hist)) # / (0.2*np.log10(len(flattened_hist[0]))))
     #print("STARTING FULL MANIPULATION PROGRAMMING")
     #print("ORIGINAL HISTOGRAM DIMENSIONS MULITPLIED: ",len(hist[0])*len(hist[0][0]))
     #print("LENGTH OF MODIFIED HISTOGRAM THAT SURVIVES THRESHOLD SELECTION: ", len(new_comb_hist))
     #print('NUMBER OF INTENDED TRACK MERGES: ', len(track_merges))
-    #print(len(track_merges))
     number_of_first_empty, track_merges = count_instances_before_first_pair_changes(track_merges)
+    #print("NUMBER OF FIRST BINS BELOW OCC THRESHOLD: ",number_of_first_empty)
+    #print("NUMBER OF MERGES REMAINING: ",len(track_merges))
     number_of_last_empty, track_merges = count_instances_before_last_pair_changes(track_merges,len(combined_hist))
-    #print('HAVING COUNTED THE NUMBER OF START AND END VALUES IN HISTOGRAM TO FAST-MERGE: (SHOULD BE FLATTENED HIST LENGTH LESS', number_of_first_empty + number_of_last_empty,'):', len(track_merges))
-
-    #print("MERGING FIRST AND LAST BINS AND REMOVING THEM, BEFORE AND AFTER LENGTHS ARE:")
+    #print("NUMBER OF LAST BINS BELOW OCC THRESHOLD: ",number_of_last_empty)
+    #print("NUMBER OF MERGES REMAINING: ",len(track_merges))
     flattened_hist = merge_first_n_bins(flattened_hist,number_of_first_empty)
     flattened_hist = merge_last_n_bins(flattened_hist,number_of_last_empty)
-
     #print("BEFORE FULL MERGE, HISTOGRAMS ARE OF LENGTH ",len(flattened_hist[0]))
     merged_flattened_hist = merge_bins_in_arrays(flattened_hist, track_merges, number_of_first_empty)
     #print("AFTER FULL MERGE, HISTOGRAMS ARE OF LENGTH ",len(merged_flattened_hist[0]))

@@ -72,6 +72,8 @@ def main(args):
   sse_df = pd.read_csv(args.input_file)
   algorithm_name = str(sse_df['algo'].iloc[0]).upper()
   if algorithm_name == "BETAB": algorithm_name = "Beta_Binomial"
+  if "pca" in algorithm_name.lower(): ender = "C"
+  if "ae" in algorithm_name.lower() or "autoencoder" in algorithm_name.lower(): ender = "D"
 
   sse_df = sse_df.loc[:,~sse_df.columns.duplicated()].copy()
   hist_cols = [col for col in sse_df.columns if '_score_' in col]
@@ -105,9 +107,6 @@ def main(args):
   cutoffs_across_hists = np.array(cutoffs_across_hists)
 
   N_bad_hists = [5,3,1]
-  #N_bad_hists = [3,2,1]
-  #N_bad_hists = [15,10,5]
-  #N_bad_hists = [30,20,10]
   tFRF_ROC_good_X = []
   tFRF_ROC_bad_Y = []
 
@@ -148,10 +147,11 @@ def main(args):
   axs[1].set_ylabel('Fraction of bad runs with at least N histogram flags')
 
   # commented out but keep for the aggregated scores plots
-  #for jj in range(len(N_bad_hists)):
-  #  print(N_bad_hists[jj])
-  #  print("C"+str(jj+1)+"X = "+str(tFRF_ROC_good_X[jj]))
-  #  print("C"+str(jj+1)+"Y = "+str(tFRF_ROC_bad_Y[jj]))
+  for jj in range(len(N_bad_hists)):
+    #print("N = "+str(N_bad_hists[jj]))
+    print(ender+str(3-jj)+"X = "+str(tFRF_ROC_good_X[3-jj]))
+    print(ender+str(3-jj)+"Y = "+str(tFRF_ROC_bad_Y[3-jj]))
+    print("")
   axs[1].plot(tFRF_ROC_good_X[0],tFRF_ROC_bad_Y[0], '-rD', mfc='purple', mec='k', markersize=8, linewidth=1, label='SSE thresholds, N = ' + str(N_bad_hists[0]))
   axs[1].plot(tFRF_ROC_good_X[1],tFRF_ROC_bad_Y[1], '-bo', mfc='yellow', mec='k', markersize=8, linewidth=1, label='SSE thresholds, N = ' + str(N_bad_hists[1]))
   axs[1].plot(tFRF_ROC_good_X[2],tFRF_ROC_bad_Y[2], '-g^', mfc='orange', mec='k', markersize=8, linewidth=1, label='SSE thresholds, N = ' + str(N_bad_hists[2]))
@@ -170,6 +170,59 @@ def main(args):
 
   plt.savefig(args.output_dir + "/RF_HF_ROC_comparison_" + algorithm_name + ".pdf",bbox_inches='tight')
   print("SAVED: " + args.output_dir + "/RF_HF_ROC_comparison_" + algorithm_name + ".pdf")
+
+  added_plots = True
+
+  if added_plots:
+    print("Starting other RF ROC plots")
+    N_bad_hists_comp = [[3,2,1],[15,10,5],[30,20,10]]
+    fig_d, axs_d = plt.subplots(ncols=3,nrows=1,figsize=(18,6))
+
+    for N_bh in range(len(N_bad_hists_comp)):
+
+      tRF_ROC_good_X_nbh = []
+      tRF_ROC_bad_Y_nbh = []
+
+      for nbh_ii in N_bad_hists_comp[N_bh]:
+        tRF_ROC_good_X_init = []
+        tRF_ROC_bad_Y_init = []
+        for cutoff_index in range(len(cutoffs_across_hists[0,:])):
+          t_cutoff_index_g_FRF_rc = count_fraction_runs_above(sse_df_good, cutoffs_across_hists[:,cutoff_index], nbh_ii)
+          t_cutoff_index_b_FRF_rc = count_fraction_runs_above(sse_df_bad, cutoffs_across_hists[:,cutoff_index], nbh_ii)
+          tRF_ROC_good_X_init.append(t_cutoff_index_g_FRF_rc)
+          tRF_ROC_bad_Y_init.append(t_cutoff_index_b_FRF_rc)
+
+        tRF_ROC_good_X_init = sorted(tRF_ROC_good_X_init)
+        tRF_ROC_bad_Y_init = sorted(tRF_ROC_bad_Y_init)
+
+        tRF_ROC_good_X_nbh.append(tRF_ROC_good_X_init)
+        tRF_ROC_bad_Y_nbh.append(tRF_ROC_bad_Y_init)
+
+      axs_d[N_bh].set_xlabel('Fraction of good runs with at least N histogram flags')
+      axs_d[N_bh].set_ylabel('Fraction of bad runs with at least N histogram flags')
+
+      axs_d[N_bh].plot(tRF_ROC_good_X_nbh[0],tRF_ROC_bad_Y_nbh[0], '-rD', mfc='purple', mec='k', markersize=8, linewidth=1, label='SSE thresholds, N = ' + str(N_bad_hists_comp[N_bh][0]))
+      axs_d[N_bh].plot(tRF_ROC_good_X_nbh[1],tRF_ROC_bad_Y_nbh[1], '-bo', mfc='yellow', mec='k', markersize=8, linewidth=1, label='SSE thresholds, N = ' + str(N_bad_hists_comp[N_bh][1]))
+      axs_d[N_bh].plot(tRF_ROC_good_X_nbh[2],tRF_ROC_bad_Y_nbh[2], '-g^', mfc='orange', mec='k', markersize=8, linewidth=1, label='SSE thresholds, N = ' + str(N_bad_hists_comp[N_bh][2]))
+      axs_d[N_bh].axis(xmin=0,xmax=0.4,ymin=0,ymax=0.8)
+      axs_d[N_bh].axline((0, 0), slope=1, linestyle='--',linewidth=0.8,color='gray')
+      axs_d[N_bh].annotate(algorithm_name + " RF ROC", xy=(0.05, 0.95), xycoords='axes fraction', xytext=(10, -10), textcoords='offset points', ha='left', va='top', fontsize=12, weight='bold')
+      axs_d[N_bh].legend(loc='lower right')
+      print("Completed hist flag set",N_bad_hists_comp[N_bh])
+
+  plt.savefig(args.output_dir + "/RF_ROC_comparison_Nvar_" + algorithm_name + ".pdf",bbox_inches='tight')
+  print("SAVED: " + args.output_dir + "/RF_ROC_comparison_Nvar_" + algorithm_name + ".pdf")
+
+
+
+
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
   args = parse_arguments()
