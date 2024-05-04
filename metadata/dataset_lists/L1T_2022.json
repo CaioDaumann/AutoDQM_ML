@@ -1,5 +1,5 @@
 {
-    "primary_datasets" : ["HLTPhysics"],
+    "primary_datasets" : ["Muon"],
     "years" : {
         "2022" : {
             "productions" : [""],
