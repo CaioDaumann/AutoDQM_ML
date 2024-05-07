@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from scipy.linalg import svd
 
+import plotting
 import utils
 
 """
@@ -20,7 +21,6 @@ TODO:
 - Should we also give the bin as input? Or only the values?
 - READ THE BEST VALIDATION EPOCH MODEL!!
 """
-
 
 # For some reason pytorch vannila dtaaset was saying the batches were lists???
 class CustomTensorDataset(TensorDataset):
@@ -82,22 +82,35 @@ rows_to_keep = ~(np.isnan(cleaned_arrays).any(axis=1) | np.isinf(cleaned_arrays)
 # Filter out rows with inf or NaN entries
 cleaned_arrays = cleaned_arrays[rows_to_keep]
 
+# Creating some anomalies!!
+made_anomalies = plotting.create_and_plot_anomalies(cleaned_arrays)
+#made_anomalies = made_anomalies / np.sum(made_anomalies)
 
 global_mean = np.mean(cleaned_arrays)
 global_std = np.std(cleaned_arrays)
 
 # Apply Z-score normalization
-normalized_arrays = [(arr - global_mean) / global_std for arr in cleaned_arrays]
+normalized_arrays    = [(arr - global_mean) / global_std for arr in cleaned_arrays]
+normalized_anomalies = [(arr - global_mean) / global_std for arr in made_anomalies]
+
+# Normalizing them to one! This has to be done since we added more event into the anomalies!
+#normalized_anomalies = normalized_anomalies / np.sum(normalized_anomalies, axis=1)[:, None]
+#normalized_arrays    = normalized_arrays / np.sum(normalized_arrays, axis=1)[:, None]
+#print(np.sum(normalized_anomalies,axis =1), np.sum( made_anomalies, axis = 1 )  ,  np.sum( normalized_arrays, axis = 1 ) )
+
+plotting.validate_nominal_and_anomalies(normalized_arrays , normalized_anomalies)
+############################################################################################################
 
 concatenated_good_runs = normalized_arrays
 concatenated_good_runs = np.nan_to_num(concatenated_good_runs)
 
 # Split the data into validation and test sets
-train_data, test_data = train_test_split(concatenated_good_runs, test_size=0.1, random_state=42)
+train_data, test_data = train_test_split(concatenated_good_runs, test_size=0.15, random_state=42)
 
 # Convert arrays to PyTorch tensors
 train_tensor = torch.tensor(train_data, dtype=torch.float32)
 test_tensor  = torch.tensor(test_data, dtype=torch.float32)
+anomalies_tensor = torch.tensor(normalized_anomalies, dtype=torch.float32)
 
 ## Lets save these tensors so one does not have to run the above code again
 # Save train_tensor
@@ -116,18 +129,29 @@ train_dataset = CustomTensorDataset(train_tensor)
 test_dataset = CustomTensorDataset(test_tensor)
 
 # Create data loaders
-train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=640, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=10000, shuffle=False)
 
+# Training the Flow model!
+import flow_for_anomalies
+
+# This is the 'simple' flow model!
+flow_model = flow_for_anomalies.normalizing_flow(train_loader, test_loader, anomalies_tensor , n_flow_layers = 15 , n_hidden_features = 512, n_hidden = 3, input_dim = len(concatenated_good_runs[0]))
+
+# Now the flow with the feature extractor!!
+print('Flow feature')
+feature_flow_model = flow_for_anomalies.feature_extraction_flow(train_loader, test_loader, n_flow_layers = 8 , n_hidden_features = 256 , n_hidden = 3, input_dim = len(concatenated_good_runs[0]))
+
+exit()
 # Training the AE model!
 print('Training the AE model with linear layers!')
-Autoencoder = utils.train_AE(train_loader, test_loader, input_size = len(concatenated_good_runs[0]), encoding_dim = 16, epochs = 10, global_mean = global_mean, global_std = global_std)
-model_ae    = Autoencoder.train_AE()
+#Autoencoder = utils.train_AE(train_loader, test_loader, input_size = len(concatenated_good_runs[0]), encoding_dim = 16, epochs = 10, global_mean = global_mean, global_std = global_std)
+#model_ae    = Autoencoder.train_AE()
 
 # Training the AE model with 1D convolutions!
 print('Training the AE model with 1D convolutions!')
-ConAutoencoder = utils.train_ConvAE(train_loader, test_loader, input_size = len(concatenated_good_runs[0]), encoding_dim = 16, epochs = 10)
-model_Convae = ConAutoencoder.train_AE()
+#ConAutoencoder = utils.train_ConvAE(train_loader, test_loader, input_size = len(concatenated_good_runs[0]), encoding_dim = 16, epochs = 10)
+#model_Convae = ConAutoencoder.train_AE()
 
 # Training the PCA model!
 from sklearn.decomposition import PCA
@@ -140,8 +164,8 @@ from sklearn.decomposition import PCA
 train_data, test_data = train_data * global_std + global_mean, test_data * global_std + global_mean
 
 print('Begining of the PCA training!')
-pca = PCA(n_components=8)
-pca.fit(train_data[:8])
+pca = PCA(n_components=6)
+pca.fit(train_data[:10])
 print('PCA model trained!')
 
 # Project data onto lower-dimensional space
