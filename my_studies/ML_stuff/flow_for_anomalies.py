@@ -33,7 +33,7 @@ ANOTHER INTERESTING IDEIA OF THE PAPER:
 """
 
 class normalizing_flow:
-    def __init__(self, train_loader, test_loader,anomalies_tensor, n_flow_layers, n_hidden_features, n_hidden, input_dim):
+    def __init__(self, train_loader, test_loader,anomalies_tensor, n_flow_layers, n_hidden_features, n_hidden, input_dim, n_epochs = 1):
         
         # This should work for 1d histograms for now
         self.n_flow_layers = n_flow_layers
@@ -49,7 +49,7 @@ class normalizing_flow:
         self.test_loader = test_loader
         self.anomalies_tensor = anomalies_tensor.to(self.device)
 
-        self.epochs = 100
+        self.epochs = n_epochs
     
         self.train_flow()
         self.plot_likelihood()
@@ -209,7 +209,7 @@ class normalizing_flow:
         # Plotting the training and test losses
         plt.figure(figsize=(10, 5))
         #plt.plot(self.train_losses, label='Train Loss')
-        bins = np.linspace(0, 0.15, 70)
+        bins = np.linspace(0, 0.18, 80)
         plt.hist(gauss_log_prob          , bins = bins, histtype='step', linewidth = 2 , label=f'- log Likelihood - mean: {np.mean(gauss_log_prob)} ')
         plt.hist(gaus_log_prob_anomalies , bins = bins, histtype='step', linewidth = 2 , color = 'red', label=f'- log Likelihood - mean: {np.mean(gaus_log_prob_anomalies)} ')
         
@@ -233,7 +233,7 @@ class normalizing_flow:
 # This flow is based on the output of a networks that has the objective of perform a feature extraction!
 ########################################################################################################
 class feature_extraction_flow:
-    def __init__(self, train_loader, test_loader, n_flow_layers, n_hidden_features, n_hidden, input_dim):
+    def __init__(self, train_loader, test_loader,anomalies_tensor , n_flow_layers, n_hidden_features, n_hidden, input_dim, n_epochs = 1):
         
         # This should work for 1d histograms for now
         self.n_flow_layers = n_flow_layers
@@ -247,8 +247,9 @@ class feature_extraction_flow:
         self.train_loader = train_loader
         self.test_loader = test_loader
         
+        self.anomalies_tensor = anomalies_tensor.to(self.device)
     
-        self.epochs = 5
+        self.epochs = n_epochs
     
         self.define_model()
         self.train_flow()
@@ -385,9 +386,9 @@ class feature_extraction_flow:
       
     # Lets plot the likelihood for the test set!
     def plot_likelihood(self):
-        
-        likelihoods = []
-        gauss_log_prob = []
+            
+        likelihoods, likelihoods_anomalies = [],[]
+        gauss_log_prob, gaus_log_prob_anomalies = [],[]
         with torch.no_grad():
             for data in self.test_loader:
                 inputs = data.to(self.device)
@@ -396,18 +397,25 @@ class feature_extraction_flow:
                 
                 likelihoods.append(-self.flow().log_prob(features).detach().cpu().numpy())  
                 gauss_log_prob.append(self.log_prob_standard_normal(self.flow().transform(features).detach().cpu().numpy() ))
+
+        # Now calculating the log prob for the anomalies
+        features = self.feature_extractor(self.anomalies_tensor)
+        
+        likelihoods_anomalies.append(-self.flow().log_prob(features).detach().cpu().numpy())  
+        gaus_log_prob_anomalies.append(self.log_prob_standard_normal(self.flow().transform(features).detach().cpu().numpy() ))
         
         # Lets concatenate everything
         likelihoods = np.concatenate([ array for array in likelihoods ])
         gauss_log_prob = np.concatenate([ array for array in gauss_log_prob ])
+        gaus_log_prob_anomalies = np.concatenate([ array for array in gaus_log_prob_anomalies ])
+        likelihoods_anomalies = np.concatenate([ array for array in likelihoods_anomalies ])
         
         # Plotting the training and test losses
         plt.figure(figsize=(10, 5))
         #plt.plot(self.train_losses, label='Train Loss')
-        plt.hist(likelihoods, bins = 100, label=f'- log Likelihood - mean: {np.mean(likelihoods)} ')
+        plt.hist(likelihoods           , bins = 100, label=f'- log Likelihood - mean: {np.mean(likelihoods)} ')
+        plt.hist(likelihoods_anomalies , bins = 100, label=f'- log Likelihood - mean: {np.mean(likelihoods_anomalies)} ')
         plt.title('Log likelihood for the test set')
-        #plt.xlabel('Epochs')
-        #plt.ylabel('Loss')
         plt.legend()
         #plt.yscale('log')
         plt.savefig('plots/feature_flow/log_likelihood_flows.png')
@@ -416,24 +424,23 @@ class feature_extraction_flow:
         # Plotting the training and test losses
         plt.figure(figsize=(10, 5))
         #plt.plot(self.train_losses, label='Train Loss')
-        plt.hist(gauss_log_prob, bins = 100, label=f'- log Likelihood - mean: {np.mean(gauss_log_prob)} ')
+        bins = np.linspace(1, 14, 80)
+        plt.hist(gauss_log_prob          , bins = bins, histtype='step', linewidth = 2 , label=f'- log Likelihood - mean: {np.mean(gauss_log_prob)} ')
+        plt.hist(gaus_log_prob_anomalies , bins = bins, histtype='step', linewidth = 2 , color = 'red', label=f'- log Likelihood - mean: {np.mean(gaus_log_prob_anomalies)} ')
+        
+        sorted_gauss_log_prob = np.sort(gauss_log_prob)
+        gauss_log_prob_treshold = sorted_gauss_log_prob[int(0.95*len(sorted_gauss_log_prob))]
+        
+        # Lets calculate the anomaly rejection rate
+        print(f'Anomaly rejection rate: {np.sum(gaus_log_prob_anomalies > gauss_log_prob_treshold)/len(gaus_log_prob_anomalies)}')
+        
+        plt.axvline(x=gauss_log_prob_treshold, color='black', linestyle='--', label =  f'95 threshold - Anomaly rejection: {np.sum(gaus_log_prob_anomalies > gauss_log_prob_treshold)/len(gaus_log_prob_anomalies)}')
+        
         plt.title('Log likelihood for the test set')
         #plt.xlabel('Epochs')
         #plt.ylabel('Loss')
         plt.legend()
         #plt.yscale('log')
         plt.savefig('plots/feature_flow/exp_likelihood_flows.png')
-        
-        # Only the log prob !!!
-        # Plotting the training and test losses
-        plt.figure(figsize=(10, 5))
-        #plt.plot(self.train_losses, label='Train Loss')
-        plt.hist(  np.clip(np.exp(-likelihoods),a_min = 0,a_max = 1e6) , bins = 100, label=f'- log Likelihood - mean: {np.mean(likelihoods)} ')
-        plt.title('Log likelihood for the test set')
-        #plt.xlabel('Epochs')
-        #plt.ylabel('Loss')
-        plt.legend()
-        #plt.yscale('log')
-        plt.savefig('plots/feature_flow/likelihood_flows.png')
 
             

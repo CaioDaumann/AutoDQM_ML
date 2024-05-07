@@ -7,8 +7,12 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from scipy.linalg import svd
 
+import yaml
+from yaml import Loader
+
 import plotting
 import utils
+import flow_for_anomalies
 
 """
 TODO:
@@ -121,9 +125,6 @@ torch.save(test_tensor, 'test_tensor.pth')
 
 print('Number of training examples:', len(train_tensor), ' and Testing examples:', len(test_tensor))
 
-# Would also be probably nice to std scale the data and maybe a log transform? Because some values are way higher than others! 
-# And they have very diferent ranges ... 
-
 # Create TensorDataset
 train_dataset = CustomTensorDataset(train_tensor)
 test_dataset = CustomTensorDataset(test_tensor)
@@ -132,84 +133,44 @@ test_dataset = CustomTensorDataset(test_tensor)
 train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=10000, shuffle=False)
 
-# Training the Flow model!
-import flow_for_anomalies
+# Loop to read over network condigurations from the yaml file: 
+stream     = open('config.yaml' , 'r')
+dictionary = yaml.load(stream,Loader)
 
-# This is the 'simple' flow model!
-flow_model = flow_for_anomalies.normalizing_flow(train_loader, test_loader, anomalies_tensor , n_flow_layers = 15 , n_hidden_features = 512, n_hidden = 3, input_dim = len(concatenated_good_runs[0]))
+avaliable_models = ["autoencoder", "1dconv_flow" ,"flow","feature_flow","pca"]
+# Checking if the entries on yaml are avaliable
+for key in dictionary:
+    if key["name"] not in avaliable_models:
+        print('The model you are trying to use is not avaliable! Please choose one of the following: ', avaliable_models)
+        exit()
 
-# Now the flow with the feature extractor!!
-print('Flow feature')
-feature_flow_model = flow_for_anomalies.feature_extraction_flow(train_loader, test_loader, n_flow_layers = 8 , n_hidden_features = 256 , n_hidden = 3, input_dim = len(concatenated_good_runs[0]))
-
-exit()
-# Training the AE model!
-print('Training the AE model with linear layers!')
-#Autoencoder = utils.train_AE(train_loader, test_loader, input_size = len(concatenated_good_runs[0]), encoding_dim = 16, epochs = 10, global_mean = global_mean, global_std = global_std)
-#model_ae    = Autoencoder.train_AE()
-
-# Training the AE model with 1D convolutions!
-print('Training the AE model with 1D convolutions!')
-#ConAutoencoder = utils.train_ConvAE(train_loader, test_loader, input_size = len(concatenated_good_runs[0]), encoding_dim = 16, epochs = 10)
-#model_Convae = ConAutoencoder.train_AE()
-
-# Training the PCA model!
-from sklearn.decomposition import PCA
-
-# Train PCA
-# Perform PCA with desired number of components
-# Train PCA
-
-# de-standardize the data
-train_data, test_data = train_data * global_std + global_mean, test_data * global_std + global_mean
-
-print('Begining of the PCA training!')
-pca = PCA(n_components=6)
-pca.fit(train_data[:10])
-print('PCA model trained!')
-
-# Project data onto lower-dimensional space
-train_data_projected = pca.transform(train_data)
-test_data_projected  = pca.transform(test_data)
-
-# Reconstruct data by transforming projected data back
-train_data_reconstructed = pca.inverse_transform(train_data_projected)
-test_data_reconstructed  = pca.inverse_transform(test_data_projected)
-
-# Calculate sum of squared errors (SSE)
-train_sse = np.sum((train_data - train_data_reconstructed) ** 2)/len(train_data)
-test_sse = np.sum((test_data - test_data_reconstructed) ** 2)/len(test_data)
-
-print("Train SSE:", np.mean(train_sse))
-print("Test SSE:", np.mean(test_sse))
-
-# Now lets validate this here!
-# Assuming test_indices is a list of indices of histograms in test_data that you want to compare
-num_examples = min(4, len(test_data))  # Number of histograms to compare (up to 5)
-
-plt.figure(figsize=(15, 4 * num_examples))
-for i in range(num_examples):
-    index = np.random.randint(len(test_data))  # Randomly select an index from test_data
+# Loop over the models and performing the training
+for key in dictionary:
     
-    # Original histogram
-    plt.subplot(num_examples, 2, 2*i+1)
-    plt.plot(test_data[index], label='Original', color='blue', linewidth=2)
-    plt.title(f'Original Histogram {index}')
-    plt.xlabel('Bin')
-    plt.ylabel('Frequency')
-    plt.legend()
-    
-    # Reconstructed histogram
-    plt.subplot(num_examples, 2, 2*i+2)
-    plt.plot(test_data_reconstructed[index], label='Reconstructed', color='red', linewidth=2)
-    plt.title(f'Reconstructed Histogram {index}')
-    plt.xlabel('Bin')
-    plt.ylabel('Frequency')
-    plt.legend()
+    if key["name"] == "flow":
+        print('normalizing flow model training was selected! Begin training!') 
 
-plt.tight_layout()
-plt.savefig('PCA_reconstruction.png')
+        # This is the 'simple' flow model!
+        flow_model = flow_for_anomalies.normalizing_flow(train_loader, test_loader, anomalies_tensor , n_flow_layers = key["n_transforms"] , n_hidden_features = key["n_nodes"], n_hidden = key["n_layers"], input_dim = len(concatenated_good_runs[0]), n_epochs = 1)
 
-# Training the Flow model!
+    if key["name"] == "feature_flow":
+        print('Feature normalizing flow model training was selected! Begin training!') 
+        
+        # This is not working yet! The log likelihood does not make sense!!
+        feature_flow_model = flow_for_anomalies.feature_extraction_flow(train_loader, test_loader,anomalies_tensor,  n_flow_layers = key["n_transforms"] , n_hidden_features = key["n_nodes"] , n_hidden = key["n_layers"], input_dim = len(concatenated_good_runs[0]), n_epochs = 10)
 
-# Training the normalized AE model!
+    if key["name"] == "autoencoder":
+        print('Autoencoder model training was selected! Begin training!') 
+
+        Autoencoder = utils.train_AE(train_loader, test_loader, input_size = len(concatenated_good_runs[0]), encoding_dim = 16, epochs = 10, global_mean = global_mean, global_std = global_std)
+        model_ae    = Autoencoder.train_AE()
+
+    if key["name"] == "1dconv_flow":
+        print('1D Convolutional flow model training was selected! Begin training!') 
+
+        ConAutoencoder = utils.train_ConvAE(train_loader, test_loader, input_size = len(concatenated_good_runs[0]), encoding_dim = 16, epochs = 10)
+        model_Convae = ConAutoencoder.train_AE()
+        
+    else:
+        print('ERROR! The model you are trying to use is not avaliable! Please choose one of the following: ', avaliable_models)
+        exit()
