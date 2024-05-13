@@ -13,6 +13,7 @@ from yaml import Loader
 import plotting
 import utils
 import flow_for_anomalies
+import normalized_ae
 
 """
 TODO:
@@ -78,7 +79,8 @@ cleaned_arrays = [arr for arr in concatenated_good_runs if arr is not None
                   and not np.isnan(arr).any() 
                   and not np.isinf(arr).any()]
 
-cleaned_arrays = cleaned_arrays/np.sum(cleaned_arrays)
+# Maybe we should normalize the data to one?
+cleaned_arrays = cleaned_arrays/np.sum(cleaned_arrays, axis =1 , keepdims = True)
 
 # Identify rows with inf or NaN entries
 rows_to_keep = ~(np.isnan(cleaned_arrays).any(axis=1) | np.isinf(cleaned_arrays).any(axis=1))
@@ -151,18 +153,18 @@ for key in dictionary:
         print('normalizing flow model training was selected! Begin training!') 
 
         # This is the 'simple' flow model!
-        flow_model = flow_for_anomalies.normalizing_flow(train_loader, test_loader, anomalies_tensor , n_flow_layers = key["n_transforms"] , n_hidden_features = key["n_nodes"], n_hidden = key["n_layers"], input_dim = len(concatenated_good_runs[0]), n_epochs = 1)
+        flow_model = flow_for_anomalies.normalizing_flow(train_loader, test_loader, anomalies_tensor , n_flow_layers = key["n_transforms"] , n_hidden_features = key["n_nodes"], n_hidden = key["n_layers"], input_dim = len(concatenated_good_runs[0]), n_epochs = 25)
 
     if key["name"] == "feature_flow":
         print('Feature normalizing flow model training was selected! Begin training!') 
         
         # This is not working yet! The log likelihood does not make sense!!
-        feature_flow_model = flow_for_anomalies.feature_extraction_flow(train_loader, test_loader,anomalies_tensor,  n_flow_layers = key["n_transforms"] , n_hidden_features = key["n_nodes"] , n_hidden = key["n_layers"], input_dim = len(concatenated_good_runs[0]), n_epochs = 10)
+        feature_flow_model = flow_for_anomalies.feature_extraction_flow(train_loader, test_loader,anomalies_tensor,  n_flow_layers = key["n_transforms"] , n_hidden_features = key["n_nodes"] , n_hidden = key["n_layers"], input_dim = len(concatenated_good_runs[0]), n_epochs = 25, n_epochs_ae = 25)
 
     if key["name"] == "autoencoder":
         print('Autoencoder model training was selected! Begin training!') 
 
-        Autoencoder = utils.train_AE(train_loader, test_loader, input_size = len(concatenated_good_runs[0]), encoding_dim = 16, epochs = 10, global_mean = global_mean, global_std = global_std)
+        Autoencoder = utils.train_AE(train_loader, test_loader, anomalies_tensor , input_size = len(concatenated_good_runs[0]), encoding_dim = 16, epochs = 10, global_mean = global_mean, global_std = global_std)
         model_ae    = Autoencoder.train_AE()
 
     if key["name"] == "1dconv_flow":
@@ -173,4 +175,5 @@ for key in dictionary:
         
     else:
         print('ERROR! The model you are trying to use is not avaliable! Please choose one of the following: ', avaliable_models)
+        print('Selected: ', key["name"])
         exit()

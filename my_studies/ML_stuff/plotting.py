@@ -6,20 +6,46 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
+def custom_uniform_sample(num_samples):
+    samples = np.zeros(num_samples)
+    #range1 = (0.15, 0.45)
+    #range2 = (0.55, 0.85)
+
+    range1 = (0.15, 0.55)
+    range2 = (0.55, 0.85)   
+    
+    # Calculate lengths of the intervals
+    length1 = range1[1] - range1[0]
+    length2 = range2[1] - range2[0]
+    total_length = length1 + length2
+    
+    # Probability of choosing from each range
+    prob_range1 = length1 / total_length
+    
+    for i in range(num_samples):
+        if np.random.rand() < prob_range1:
+            # Sample from the first range
+            samples[i] = np.random.uniform(range1[0], range1[1])
+        else:
+            # Sample from the second range
+            samples[i] = np.random.uniform(range2[0], range2[1])
+            
+    return samples
+
 def create_and_plot_anomalies(test_set):
     
     ## Lets create a list to store all of the generated anomalies!
     anomaly_list, anomaly_list_stacked = [],[]
-    number_of_anomalies = 10000
+    number_of_anomalies = 12000
     
     for i in range(int(number_of_anomalies)):
 
         np.random.seed()
 
         # Set parameters for the Gaussian distribution
-        mean    =  np.random.uniform(0.2, 0.8) #0.8
-        std_dev =  np.random.uniform(0.05, 0.1) #0.1
-        num_samples = 10000
+        mean    =  custom_uniform_sample(1) #np.random.uniform(0.15, 0.85) #0.8
+        std_dev =  np.random.uniform(0.01, 0.1) #0.1
+        num_samples = 12000
 
         # Assuming 'test_set' is defined somewhere else and contains valid data
         y = test_set[i]  # Ensure this index access is valid
@@ -39,12 +65,14 @@ def create_and_plot_anomalies(test_set):
         counts, _ = np.histogram(data, bins=bin_edges)
 
         # Normalize and scale counts based on 'y'
-        normalized_counts = 0.1 * np.sum(y) * counts / np.sum(counts)
+        normalized_counts = 0.2 * np.sum(y) * counts / np.sum(counts)
 
         # Prepare stacked data
         stacked_y = y + normalized_counts
         
         stacked_y = np.sum(y) * stacked_y / np.sum(stacked_y)
+        # Maybe we should normalize the data to one?
+        #cleaned_arrays = cleaned_arrays/np.sum(cleaned_arrays, axis =1 , keepdims = True)
         
         anomaly_list.append(normalized_counts)
         anomaly_list_stacked.append(stacked_y)
@@ -114,5 +142,8 @@ def validate_nominal_and_anomalies(test_set, anomaly_list_stacked):
         # Save the plot to a file
         plt.savefig('plots/anomalies/comparison_' +str(plot)+'.png')
     
+    return 0
+
+def plot_sse_scores(test_set, test_data_reconstructed, anomalous_data ,anomalous_data_reconstructed):
     return 0
 

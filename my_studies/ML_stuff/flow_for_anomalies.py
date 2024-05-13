@@ -227,13 +227,45 @@ class normalizing_flow:
         plt.legend()
         #plt.yscale('log')
         plt.savefig('plots/exp_likelihood_flows.png')
-            
+ 
+ 
+class AutoencoderForFeatureExtraction(nn.Module):
+    def __init__(self, input_dim):
+        super(AutoencoderForFeatureExtraction, self).__init__()
+        self.input_dim = input_dim
+        
+        # Define the feature extractor (encoder)
+        self.encoder = nn.Sequential(
+            nn.Linear(self.input_dim, int(self.input_dim / 2)),
+            nn.Tanh(),
+            nn.Linear(int(self.input_dim / 2), int(self.input_dim / 4)),
+            nn.Tanh(),
+            nn.Linear(int(self.input_dim / 4), int(self.input_dim / 10)),
+            nn.Tanh()
+        )
+        
+        # Define the decoder
+        self.decoder = nn.Sequential(
+            nn.Linear(int(self.input_dim / 10), int(self.input_dim / 4)),
+            nn.Tanh(),
+            nn.Linear(int(self.input_dim / 4), int(self.input_dim / 2)),
+            nn.Tanh(),
+            nn.Linear(int(self.input_dim / 2), self.input_dim)
+        )
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
+
+    def extract_features(self, x):
+        return self.encoder(x)
                 
 ########################################################################################################               
 # This flow is based on the output of a networks that has the objective of perform a feature extraction!
 ########################################################################################################
 class feature_extraction_flow:
-    def __init__(self, train_loader, test_loader,anomalies_tensor , n_flow_layers, n_hidden_features, n_hidden, input_dim, n_epochs = 1):
+    def __init__(self, train_loader, test_loader,anomalies_tensor , n_flow_layers, n_hidden_features, n_hidden, input_dim, n_epochs = 1, n_epochs_ae = 10):
         
         # This should work for 1d histograms for now
         self.n_flow_layers = n_flow_layers
@@ -250,6 +282,7 @@ class feature_extraction_flow:
         self.anomalies_tensor = anomalies_tensor.to(self.device)
     
         self.epochs = n_epochs
+        self.n_epochs_ae = n_epochs_ae
     
         self.define_model()
         self.train_flow()
@@ -258,35 +291,78 @@ class feature_extraction_flow:
         self.plot_latent_space()
     
     def define_model(self):
-        
-        # Lets define the feature extractor
-        self.feature_extractor = nn.Sequential(
-            
-            nn.Linear(self.input_dim,  int(self.input_dim/2) ),
-            nn.ReLU(),
-            nn.Linear(int(self.input_dim/2), int(self.input_dim/4)),
-            nn.ReLU(),
-            nn.Linear(int(self.input_dim/4), int(self.input_dim/10))
-            
-        ).to(self.device)
-        
-        
         self.flow = zuko.flows.NSF(features=int(self.input_dim/10), transforms=self.n_flow_layers, hidden_features=[self.n_hidden_features]*self.n_hidden, passes=2).to(self.device)
 
     
     def train_flow(self):
         
+        # Lets define and train the feature extractor
+        self.feature_extractor = AutoencoderForFeatureExtraction(self.input_dim).to(self.device)
+        optimizer = optim.AdamW(self.feature_extractor.parameters(), lr=1e-3, weight_decay=1e-12)
+        
+        early_stopper = EarlyStopper(patience=10)
+        
+        criterion = nn.MSELoss()
+        self.train_ae_losses, self.test_ae_losses  = [],[]
+        # Training and Validation Loop
+        for epoch in range(self.n_epochs_ae):
+            self.flow.train()  # Set the model to training mode
+            train_loss = 0.0
+            for data in self.train_loader:
+                inputs = data.to(self.device)
+                           
+                # Zero the parameter gradients
+                optimizer.zero_grad()
+                
+                output = self.feature_extractor(inputs)
+                loss   = criterion(inputs, output).mean() 
+
+                # Backward pass and optimize
+                loss.backward()
+                optimizer.step()
+                
+                # Track the loss
+                train_loss += loss.item()
+
+            # Calculate average training loss for the epoch
+            avg_train_loss = train_loss / len(self.train_loader)
+            self.train_ae_losses.append(avg_train_loss)        
+        
+            test_loss = 0.0
+            with torch.no_grad():
+                for data in self.test_loader:
+                    inputs = data.to(self.device)
+                    output = self.feature_extractor(inputs)
+                    loss = criterion(inputs, output).mean()       
+                    test_loss += loss.item()
+                    
+            if( early_stopper.early_stop(test_loss) ):
+                print("Early Stopping!")
+                break
+            
+            self.test_ae_losses.append( test_loss / len(self.test_loader))
+            
+            
+            print('Feature extractor training: Epoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f}'.format(epoch, avg_train_loss, test_loss))
+        
+        self.plot_ae_loss()
+        
+        # Setting feature extractor to eval mode!
+        self.feature_extractor.eval()
+        
+        ## Now, we continue the flow training!
+        
         # Get parameters from both modules
-        parameters = list(self.flow.parameters()) + list(self.feature_extractor.parameters())
+        parameters = list(self.flow.parameters())
         
         # Optimizer (You can adjust the learning rate as needed)
-        optimizer = optim.AdamW(parameters, lr=5e-4, weight_decay=1e-12) #Lets add some L2 regularization
-
-        early_stopper = EarlyStopper(patience=15)
+        optimizer = optim.AdamW(parameters, lr=1e-4, weight_decay=1e-12) #Lets add some L2 regularization
+        early_stopper = EarlyStopper(patience=10)
         
         # Lists to store loss values
         self.train_losses = []
         self.test_losses = []
+        self.rejection_rate = []
         
         # Training and Validation Loop
         for epoch in range(self.epochs):
@@ -298,12 +374,15 @@ class feature_extraction_flow:
                 # Zero the parameter gradients
                 optimizer.zero_grad()
                 
-                features = self.feature_extractor(inputs)
-                # Forward pass
-                loss = -self.flow().log_prob(features).mean()
+                features = self.feature_extractor.extract_features(inputs)
+                loss =-self.flow().log_prob(features).mean() 
 
                 # Backward pass and optimize
                 loss.backward()
+
+                # Lets clip the gradients for stability
+                torch.nn.utils.clip_grad_norm_(self.flow.parameters(), 1e-1)
+
                 optimizer.step()
                 
                 # Track the loss
@@ -319,10 +398,12 @@ class feature_extraction_flow:
             with torch.no_grad():
                 for data in self.test_loader:
                     inputs = data.to(self.device)
-                    features = self.feature_extractor(inputs)
+                    features = self.feature_extractor.extract_features(inputs)
             
                     loss =  -self.flow().log_prob(features).mean()        
                     test_loss += loss.item()
+
+            self.rejection_rate.append( self.calculate_rejection_rate() )
                     
             if( early_stopper.early_stop(test_loss) ):
                 print("Early Stopping!")
@@ -340,17 +421,43 @@ class feature_extraction_flow:
             self.plot_loss()
             self.plot_latent_space()
     
-    def plot_loss(self):
+    def plot_ae_loss(self):
         
         # Plotting the training and test losses
         plt.figure(figsize=(10, 5))
-        plt.plot(self.train_losses, label='Train Loss')
-        plt.plot(self.test_losses, label='Test Loss')
+        plt.plot(self.train_ae_losses , label='Train Loss')
+        plt.plot(self.test_ae_losses  , label='Test Loss')
         plt.title('Loss Progression over Epochs')
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
         plt.legend()
         #plt.yscale('log')
+        plt.savefig('plots/feature_flow/ae_feature_loss.png')
+        
+    
+    def plot_loss(self):
+        
+        # Plotting the training and test losses
+        fig, ax1 = plt.subplots(figsize=(10, 5))
+
+        ax1.plot(self.train_losses, label='Train Loss', color='blue')
+        ax1.plot(self.test_losses, label='Test Loss', color='green')
+
+        ax1.set_xlabel('Epochs')
+        ax1.set_ylabel('Loss')
+        ax1.tick_params(axis='y')
+        ax1.legend(loc='upper left')
+
+        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+
+        ax2.plot(self.rejection_rate, label='Rejection Rate', color='red')
+        ax2.set_ylabel('Rejection Rate')
+        ax2.tick_params(axis='y')
+        ax2.legend()
+
+        fig.tight_layout()  # otherwise the right y-label is slightly clipped
+        plt.title('Loss Progression over Epochs')
+        plt.legend()
         plt.savefig('plots/feature_flow/Flow_loss.png')
     
     def plot_latent_space(self):
@@ -359,7 +466,7 @@ class feature_extraction_flow:
         with torch.no_grad():
             for data in self.test_loader:
                 inputs = data.to(self.device)
-                features = self.feature_extractor(inputs)
+                features = self.feature_extractor.extract_features(inputs)
                 
                 latent_space_100.append(self.flow().transform(features).detach().cpu().numpy())
         # Lets concatenate everything
@@ -377,7 +484,40 @@ class feature_extraction_flow:
         #plt.yscale('log')
         plt.savefig('plots/feature_flow/base_distribution_flows.png')
         
-      
+    # Calculates the rejection rate tohether with the loss!!
+    def calculate_rejection_rate(self):    
+        
+        likelihoods, likelihoods_anomalies = [],[]
+        gauss_log_prob, gaus_log_prob_anomalies = [],[]
+        with torch.no_grad():
+            for data in self.test_loader:
+                inputs = data.to(self.device)
+                
+                features = self.feature_extractor.extract_features(inputs)
+                
+                likelihoods.append(-self.flow().log_prob(features).detach().cpu().numpy())  
+                gauss_log_prob.append(self.log_prob_standard_normal(self.flow().transform(features).detach().cpu().numpy() ))
+        
+            # Now calculating the log prob for the anomalies
+            features = self.feature_extractor.extract_features(self.anomalies_tensor)
+        
+            likelihoods_anomalies.append(-self.flow().log_prob(features).detach().cpu().numpy())  
+            gaus_log_prob_anomalies.append(self.log_prob_standard_normal(self.flow().transform(features).detach().cpu().numpy() ))
+     
+            # Lets concatenate everything
+            likelihoods = np.concatenate([ array for array in likelihoods ])
+            gauss_log_prob = np.concatenate([ array for array in gauss_log_prob ])
+            gaus_log_prob_anomalies = np.concatenate([ array for array in gaus_log_prob_anomalies ])
+            likelihoods_anomalies = np.concatenate([ array for array in likelihoods_anomalies ])     
+     
+            sorted_gauss_log_prob = np.sort(gauss_log_prob)
+            gauss_log_prob_treshold = sorted_gauss_log_prob[int(0.95*len(sorted_gauss_log_prob))]
+        
+            # Lets calculate the anomaly rejection rate
+            rejection_rate = np.sum(gaus_log_prob_anomalies > gauss_log_prob_treshold)/len(gaus_log_prob_anomalies)
+        
+        return rejection_rate
+        
     def log_prob_standard_normal(self,x):
             if len(x.shape) == 1:
                 x = np.expand_dims(x, axis=0)  # Add a new axis if X is a 1D array
@@ -393,13 +533,13 @@ class feature_extraction_flow:
             for data in self.test_loader:
                 inputs = data.to(self.device)
                 
-                features = self.feature_extractor(inputs)
+                features = self.feature_extractor.extract_features(inputs)
                 
                 likelihoods.append(-self.flow().log_prob(features).detach().cpu().numpy())  
                 gauss_log_prob.append(self.log_prob_standard_normal(self.flow().transform(features).detach().cpu().numpy() ))
 
         # Now calculating the log prob for the anomalies
-        features = self.feature_extractor(self.anomalies_tensor)
+        features = self.feature_extractor.extract_features(self.anomalies_tensor)
         
         likelihoods_anomalies.append(-self.flow().log_prob(features).detach().cpu().numpy())  
         gaus_log_prob_anomalies.append(self.log_prob_standard_normal(self.flow().transform(features).detach().cpu().numpy() ))
@@ -421,10 +561,9 @@ class feature_extraction_flow:
         plt.savefig('plots/feature_flow/log_likelihood_flows.png')
         
         # Now the exponentiaded!
-        # Plotting the training and test losses
         plt.figure(figsize=(10, 5))
-        #plt.plot(self.train_losses, label='Train Loss')
-        bins = np.linspace(1, 14, 80)
+        
+        bins = np.linspace(0, np.mean(gauss_log_prob) + 25*np.std(gauss_log_prob), 80)
         plt.hist(gauss_log_prob          , bins = bins, histtype='step', linewidth = 2 , label=f'- log Likelihood - mean: {np.mean(gauss_log_prob)} ')
         plt.hist(gaus_log_prob_anomalies , bins = bins, histtype='step', linewidth = 2 , color = 'red', label=f'- log Likelihood - mean: {np.mean(gaus_log_prob_anomalies)} ')
         
@@ -437,10 +576,5 @@ class feature_extraction_flow:
         plt.axvline(x=gauss_log_prob_treshold, color='black', linestyle='--', label =  f'95 threshold - Anomaly rejection: {np.sum(gaus_log_prob_anomalies > gauss_log_prob_treshold)/len(gaus_log_prob_anomalies)}')
         
         plt.title('Log likelihood for the test set')
-        #plt.xlabel('Epochs')
-        #plt.ylabel('Loss')
         plt.legend()
-        #plt.yscale('log')
         plt.savefig('plots/feature_flow/exp_likelihood_flows.png')
-
-            

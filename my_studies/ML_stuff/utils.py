@@ -35,7 +35,7 @@ class Autoencoder(nn.Module):
         return x
     
 class train_AE:
-    def __init__(self,train_loader,test_loader, input_size, encoding_dim = 16, epochs = 100, global_mean = 0, global_std = 1,linear = True,):    
+    def __init__(self,train_loader,test_loader, anomalies_tensor, input_size, encoding_dim = 16, epochs = 100, global_mean = 0, global_std = 1, linear = True):    
     
         self.Is_Linear = linear
         if(self.Is_Linear):
@@ -43,8 +43,9 @@ class train_AE:
         else:
             self.model_ae = ConvAutoencoder( input_channels = 1, encoding_dim = encoding_dim)
     
-        self.train_loader = train_loader
-        self.test_loader = test_loader
+        self.train_loader     = train_loader
+        self.test_loader      = test_loader
+        self.anomalies_tensor = anomalies_tensor
         
         self.epochs = epochs
     
@@ -130,13 +131,11 @@ class train_AE:
         plt.ylabel('Loss')
         plt.legend()
         plt.yscale('log')
-        plt.savefig('Loss.png')
+        plt.savefig('plots/autoencoders/Loss.png')
         
     def evaluate_model(self):
-        # Plotting the reconstructed histograms!
-
-        # Assuming `model_ae` is already trained and `self.test_loader` is defined
-        self.model_ae.eval()  # Ensure the model is in evaluation mode
+        # Ensure the model is in evaluation mode
+        self.model_ae.eval()
 
         # Fetch one batch of test data
         dataiter = iter(self.test_loader)
@@ -145,58 +144,83 @@ class train_AE:
         # Generate reconstructions
         with torch.no_grad():
             reconstructed_histograms = self.model_ae(test_histograms)
+            reconstructed_anomalies = self.model_ae(self.anomalies_tensor)
 
-        # I need to unstandardize the histograms now!!
-        test_histograms          = test_histograms * self.global_std + self.global_mean
-        reconstructed_histograms = reconstructed_histograms * self.global_std + self.global_mean
+        # Unstandardize the histograms
+        test_histograms_unstd           = test_histograms * self.global_std + self.global_mean
+        reconstructed_histograms_unstd  = reconstructed_histograms * self.global_std + self.global_mean
+        reconstructed_anomalies_unstd   = reconstructed_anomalies * self.global_std + self.global_mean
+        anomalies_tensor_unstd          = self.anomalies_tensor * self.global_std + self.global_mean
 
         # Convert tensors to numpy for plotting
-        test_histograms = test_histograms.cpu().numpy()
-        reconstructed_histograms = reconstructed_histograms.cpu().numpy()
+        test_histograms_unstd = test_histograms_unstd.cpu().numpy()
+        reconstructed_histograms_unstd = reconstructed_histograms_unstd.cpu().numpy()
+        reconstructed_anomalies_unstd = reconstructed_anomalies_unstd.cpu().numpy()
+        anomalies_tensor_unstd = anomalies_tensor_unstd.cpu().numpy()
 
-        # Plotting the SSE curve
-        sse = np.sum((test_histograms/np.sum(test_histograms,0) - reconstructed_histograms/np.sum(reconstructed_histograms,0)) ** 2,1)
+        # Lets normalize everything to one!
+        #test_histograms_unstd = test_histograms_unstd / np.sum(test_histograms_unstd, axis=1, keepdims=True)
+        #reconstructed_histograms_unstd = reconstructed_histograms_unstd / np.sum(reconstructed_histograms_unstd, axis=1, keepdims=True)
+        #reconstructed_anomalies_unstd = reconstructed_anomalies_unstd / np.sum(reconstructed_anomalies_unstd, axis=1, keepdims=True)
+        #anomalies_tensor_unstd = anomalies_tensor_unstd / np.sum(anomalies_tensor_unstd, axis=1, keepdims=True)
+        
+        # Calculate and plot SSE distributions
+        self.plot_sse_distributions(test_histograms_unstd, reconstructed_histograms_unstd,
+                                    anomalies_tensor_unstd, reconstructed_anomalies_unstd)
+
+        # Plot original vs. reconstructed histograms
+        self.plot_histograms(test_histograms_unstd, reconstructed_histograms_unstd, title='Nominal')
+        self.plot_histograms(anomalies_tensor_unstd, reconstructed_anomalies_unstd, title='Anomalous')
+
+        # Plot histograms with high and low SSE
+        self.plot_extreme_sse_histograms(test_histograms_unstd, reconstructed_histograms_unstd, 'Nominal')
+        self.plot_extreme_sse_histograms(anomalies_tensor_unstd, reconstructed_anomalies_unstd, 'Anomalous')
+
+    def plot_sse_distributions(self, test_histograms, reconstructed_histograms, anomalies, reconstructed_anomalies):
+        sse_nominal = np.sum((test_histograms - reconstructed_histograms) ** 2, axis=1)
+        sse_anomalies = np.sum((anomalies - reconstructed_anomalies) ** 2, axis=1)
+
+        sse_threshold = np.percentile(np.nan_to_num(sse_nominal, nan=1e3), 95)
+
+        #print(sse_nominal)
+        #print(sse_threshold)
+        #print(sse_anomalies)
+        #exit()
+
         plt.figure(figsize=(12, 6))
-        bins = np.linspace( 1e-8 , 1e-3, 100)
-        plt.hist(sse, bins = bins)
-        plt.title('Sum of Squared Errors (SSE) over Test Set')
+        bins = np.linspace(min(sse_nominal), sse_threshold * 1.10, 100)
+        plt.hist(sse_nominal, bins=bins, histtype='step', linewidth=2, color='blue', label='Nominal')
+        plt.hist(sse_anomalies, bins=bins, histtype='step', linewidth=2, color='red', label='Anomalies')
+        plt.axvline(x=sse_threshold, color='black', linestyle='--', label=f'95% threshold - Anomaly rejection: {np.mean(sse_anomalies > sse_threshold):.2f}')
+        plt.title('Sum of Squared Errors (SSE) over Test and Anomalous Sets')
         plt.xlabel('SSE')
-        plt.ylabel('Events')
-        #plt.yscale('log')
-
-        # Calculate the mean SSE
-        mean_sse = np.mean(sse)
-
-        # Convert mean SSE to scientific notation
-        mean_sse_sci = '{:.2e}'.format(mean_sse)
-
-        # Add text with the mean SSE in scientific notation to the top left corner of the plot
-        plt.text(0.1, 0.9, f'Mean SSE: {mean_sse_sci}', fontsize=12, ha='left', va='top', transform=plt.gca().transAxes)
-
-        # Set x-axis to log scale
-        #plt.xscale('log')
-     
-        plt.savefig('SSE_curve.png')
+        plt.ylabel('Frequency')
+        plt.legend()
+        plt.savefig('plots/autoencoders/SSE_curve.png')
         plt.close()
 
-        # Plot original and reconstructed histograms
-        # Plot original and reconstructed histograms and calculate SSE
-        num_examples = min(3, len(test_histograms))  # Plot up to 5 examples
+    def plot_histograms(self, original, reconstructed, title):
+        num_examples = min(5, len(original))
         plt.figure(figsize=(14, num_examples * 4))
         for i in range(num_examples):
-            # Calculate SSE
-            sse = np.sum(( test_histograms[i]/np.sum(test_histograms[i]) - reconstructed_histograms[i]/np.sum(reconstructed_histograms[i])) ** 2)
-            
-            # Plotting
+            sse = np.sum((original[i] - reconstructed[i]) ** 2)
             plt.subplot(num_examples, 1, i + 1)
-            plt.plot(test_histograms[i], label='Original', color='blue', linewidth = 3)
-            plt.plot(reconstructed_histograms[i], label='Reconstructed', color='red', alpha=0.7, linewidth = 3)
-            plt.title(f"Original vs. Reconstructed Histogram {i+1} - SSE: {sse:.4e}")
+            plt.plot(original[i], label='Original', color='blue', linewidth=3)
+            plt.plot(reconstructed[i], label='Reconstructed', color='red', alpha=0.7, linewidth=3)
+            plt.title(f"{title} {i + 1} - SSE: {sse:.2e}")
             plt.legend(fontsize=16)
-
         plt.tight_layout()
-        plt.savefig('reconstructed_Histograms.png')
-        #print('Number of training examples:', len(self.train_tensor), ' and Testing examples:', len(self.test_tensor))
+        plt.savefig(f'plots/autoencoders/{title.replace(" ", "_").lower()}_histograms.png')
+        plt.close()
+
+    def plot_extreme_sse_histograms(self, original, reconstructed, set_name):
+        sse = np.sum((original - reconstructed) ** 2, axis=1)
+        high_sse_indices = sse >= np.percentile(sse, 95)
+        low_sse_indices = sse <= np.percentile(sse, 5)
+
+        self.plot_histograms(original[high_sse_indices], reconstructed[high_sse_indices], title=f'{set_name} High SSE')
+        self.plot_histograms(original[low_sse_indices], reconstructed[low_sse_indices], title=f'{set_name} Low SSE')
+
     
 class EarlyStopper:
     def __init__(self, patience=1, min_delta=0):
