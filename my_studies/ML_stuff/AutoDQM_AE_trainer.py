@@ -132,8 +132,8 @@ train_dataset = CustomTensorDataset(train_tensor)
 test_dataset = CustomTensorDataset(test_tensor)
 
 # Create data loaders
-train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=10000, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=512, shuffle=True)
+test_loader = DataLoader(test_dataset  , batch_size=10000, shuffle=False)
 
 # Loop to read over network condigurations from the yaml file: 
 stream     = open('config.yaml' , 'r')
@@ -145,6 +145,10 @@ for key in dictionary:
     if key["name"] not in avaliable_models:
         print('The model you are trying to use is not avaliable! Please choose one of the following: ', avaliable_models)
         exit()
+
+
+normalized_ae.train_a_nae(train_loader, test_loader,anomalies_tensor)
+exit() ### remove this please!!!
 
 # Loop over the models and performing the training
 for key in dictionary:
