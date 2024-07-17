@@ -22,7 +22,7 @@ class StatisticalTester(AnomalyDetectionAlgorithm):
         self.reference = kwargs.get("reference", None)
 
     def predict(self):
-        nRef = 1 ## Number of reference runs required
+        nRef = 8 ## Number of reference runs required
         sort_runs= pd.DataFrame({x:self.df[x] for x in ['run_number', 'label']})## List of all runs, with the label
         sort_runs = sort_runs.sort_values(by='run_number', ascending=False) ##sorted low to high
         ## can make a boolean df here with the conditions, then access the bollean array in the  if (xRun < self.df['run_number'][i]) and (not xRun in ref_runs) line
@@ -34,6 +34,8 @@ class StatisticalTester(AnomalyDetectionAlgorithm):
             ## Initialize values to -99
             score_chi2 = numpy.zeros(len(self.df)) - 99
             score_pull = numpy.zeros(len(self.df)) - 99
+            score_nEntries = numpy.zeros(len(self.df)) - 99
+            score_nDims = numpy.zeros(len(self.df)) - 99
 
             ## Loop over runs
             for i in range(len(score_chi2)):
@@ -63,12 +65,15 @@ class StatisticalTester(AnomalyDetectionAlgorithm):
                                     'r_ser', 'r_samp', ref_runs, 'hName', [rh for rh in ref_hists],
                                     False, False)
 
-                chi2_value, pull_value = bb.beta_binomial(hPair)
+                chi2_value, pull_value, n_entries, nDims = bb.beta_binomial(hPair)
                 score_chi2[i] = chi2_value
                 score_pull[i] = abs(pull_value)
+                score_nEntries[i] = n_entries
+                score_nDims[i] = nDims
             self.add_prediction(histogram+'_chi2', score_chi2)
             self.add_prediction(histogram+'_pull', score_pull)
-
+            self.add_prediction(histogram+'_nEntries', score_nEntries)
+            self.add_prediction(histogram+'_nDims', score_nDims)
 
     def ks_test(self, target, reference):
         """

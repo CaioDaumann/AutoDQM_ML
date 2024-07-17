@@ -80,7 +80,6 @@ class AnomalyDetectionAlgorithm():
         # Load dataframe
         df = awkward.from_parquet(self.input_file)
 
-
         # Set helpful metadata
         for histogram, histogram_info in self.histograms.items():
             self.histograms[histogram]["name"] = histogram.replace("/", "").replace(" ","")

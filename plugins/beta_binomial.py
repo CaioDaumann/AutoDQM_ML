@@ -4,6 +4,7 @@ import uproot
 import numpy as np
 import scipy.stats as stats
 from scipy.special import gammaln
+from autodqm.rebin_utils import rebin_pull_hist
 
 def comparators():
     return {
@@ -101,9 +102,17 @@ def beta_binomial(histpair, pull_cap=15, chi2_cut=10, pull_cut=10, min_entries=1
     if abs(min_pull) > max_pull:
         max_pull = min_pull
 
+    # For test propouses! - should we do it only for Occupancy plots??
+    # lets check if the histogram is 2d
+    #if 'TH2' in str(type(data_hist_orig)):
+    if pull_hist.ndim > 1:
+        chi2 = rebin_pull_hist(pull_hist, histpair)
+    #if 'Occupancy' in histpair.data_name:
+    #    chi2 = rebin_pull_hist(pull_hist, histpair)
+
     print('DEBUG: chi2 = %f, max_pull = %f\n' % (chi2, max_pull))
 
-    return chi2, max_pull
+    return chi2, max_pull, data_hist_Entries, pull_hist.ndim
 
 
 def pull(D_raw, R_list_raw, tol=0.01):
