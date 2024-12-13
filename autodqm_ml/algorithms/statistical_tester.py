@@ -22,7 +22,7 @@ class StatisticalTester(AnomalyDetectionAlgorithm):
         self.reference = kwargs.get("reference", None)
 
     def predict(self):
-        nRef = 8 ## Number of reference runs required
+        nRef = 3 ## Number of reference runs required
         sort_runs= pd.DataFrame({x:self.df[x] for x in ['run_number', 'label']})## List of all runs, with the label
         sort_runs = sort_runs.sort_values(by='run_number', ascending=False) ##sorted low to high
         ## can make a boolean df here with the conditions, then access the bollean array in the  if (xRun < self.df['run_number'][i]) and (not xRun in ref_runs) line

@@ -116,7 +116,7 @@ def main_plotter(Chi2_1d_good, nEntries_1d_good, Chi2_1d_bad, nEntries_1d_bad, C
     fig, axs = plt.subplots(2, 2, figsize=(10, 10))
 
     # Scatter plot in the top left subplot (1, 1)
-    axs[0, 0].scatter([nEntries_1d_good],[Chi2_1d_good], alpha=0.5, color = 'blue', s=10)
+    axs[0, 0].scatter([nEntries_1d_good],[Chi2_1d_good], alpha=0.5, color = 'blue', s=6)
     axs[0, 0].set_title('1D Histograms - Good Runs', fontsize=18)
     #axs[0, 0].set_xlabel('Ranked nEntries')
     if IsLumi:
@@ -133,7 +133,7 @@ def main_plotter(Chi2_1d_good, nEntries_1d_good, Chi2_1d_bad, nEntries_1d_bad, C
         axs[0, 0].set_yscale('log')
 
     # Scatter plot in the top right subplot (1, 2)
-    axs[0, 1].scatter([nEntries_1d_bad], [Chi2_1d_bad], alpha=0.5, color = 'red', s=10)
+    axs[0, 1].scatter([nEntries_1d_bad], [Chi2_1d_bad], alpha=0.5, color = 'red', s=6)
     axs[0, 1].set_title('1D Histograms - Bad Runs', fontsize=18)
     #axs[0, 1].set_xlabel('Ranked nEntries')
     #axs[0, 1].set_ylabel('Ranked Chi2 Scores')
@@ -142,7 +142,7 @@ def main_plotter(Chi2_1d_good, nEntries_1d_good, Chi2_1d_bad, nEntries_1d_bad, C
         axs[0, 1].set_yscale('log')
 
     # Scatter plot in the bottom left subplot (2, 1)
-    axs[1, 0].scatter([nEntries_2d_good], [Chi2_2d_good], alpha=0.5, color = 'blue', s=10)
+    axs[1, 0].scatter([nEntries_2d_good], [Chi2_2d_good], alpha=0.5, color = 'blue', s=6)
     axs[1, 0].set_title('2D Histograms - Good Runs', fontsize=18)
     if IsLumi:
         axs[1, 0].set_xlabel('dcs_rec_lumi', fontsize=16)
@@ -161,7 +161,7 @@ def main_plotter(Chi2_1d_good, nEntries_1d_good, Chi2_1d_bad, nEntries_1d_bad, C
         axs[1, 0].set_yscale('log')
 
     # Scatter plot in the bottom right subplot (2, 2)
-    axs[1, 1].scatter([nEntries_2d_bad], [Chi2_2d_bad], alpha=0.5, color = 'red', s=10)
+    axs[1, 1].scatter([nEntries_2d_bad], [Chi2_2d_bad], alpha=0.5, color = 'red', s=6)
     axs[1, 1].set_title('2D Histograms - Bad Runs', fontsize=18)
     if IsLumi:
         axs[1, 1].set_xlabel('dcs_rec_lumi', fontsize=16)
@@ -187,7 +187,7 @@ def main_plotter(Chi2_1d_good, nEntries_1d_good, Chi2_1d_bad, nEntries_1d_bad, C
             ax.set_ylim(y_min, y_max)
 
     # Add a title to the entire figure
-    fig.suptitle('Algorithms - Hot bins and Rebin', fontsize=20)
+    fig.suptitle('Algorithms - No additional', fontsize=20)
 
     #plt.title('Scatter Plot of Ranked Chi2 Scores vs Ranked nEntries Scores - With Hot bin/Rebin')
     # Adjust layout
@@ -333,7 +333,7 @@ def scatter_ranked_chi2_vs_ranked_nEntries(df):
 def main():
 
     # Reading the file
-    path = "../with_dimensions_in_df/l1t_bb.csv"
+    path = "../with_dimensions_in_df/no_algos/l1t_bb.csv"
     read_file = pd.read_csv(path)
 
     # Adding the run_ls_rec and other lumi related variables

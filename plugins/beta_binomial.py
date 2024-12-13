@@ -106,7 +106,8 @@ def beta_binomial(histpair, pull_cap=15, chi2_cut=10, pull_cut=10, min_entries=1
     # lets check if the histogram is 2d
     #if 'TH2' in str(type(data_hist_orig)):
     if pull_hist.ndim > 1:
-        chi2 = rebin_pull_hist(pull_hist, histpair)
+        pass
+        #chi2 = rebin_pull_hist(pull_hist, histpair, chi2, nBinsUsed)
     #if 'Occupancy' in histpair.data_name:
     #    chi2 = rebin_pull_hist(pull_hist, histpair)
 
